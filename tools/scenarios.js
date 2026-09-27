@@ -14,9 +14,9 @@
 //   · PointerEvent / elementFromPoint 要的是 client 坐标，所以走 clientOf()（加了
 //     canvas.getBoundingClientRect() 的偏移）。
 //
-// 断言的**条数**是被算过的：每一条都要配一张「把哪一行改坏它就红」的变异证据（见
-// tools/verify.sh 的 MUTATION 段与本轮交付的变异表）。所以这里一行就是一句话，
-// 合得上就合、合不上就删——写不出变异证据的断言不留。
+// 断言的**条数**是被算过的：每一条都要配一张「把哪一行改坏它就红」的变异证据——证据记在
+// 每一条进来时的 commit message 里（verify.sh 刻意不放断言、也不放变异表，它只管生命周期）。
+// 这里一行就是一句话，合得上就合、合不上就删——写不出变异证据的断言不留。
 //
 // window.slither.engine 就是玩家加载的那张模块图，所以这里绿一次，等于页面那侧的出题器/
 // 几何/判胜同时绿一次。夹具全部来自 tools/golden.mjs 的冻结数据（页面用 document.baseURI
