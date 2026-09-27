@@ -163,6 +163,20 @@
     }
   }
 
+  // 结构纪律的 grep 口径：**只剥整行注释**（行首只有空白 + `//`），其余字节一个都不动。
+  // 为什么只剥这种：board.js 顶上那条纪律说明自己写着「本文件不许出现 p.loop / edgeSet」，
+  // 逐行 grep 会把这句宣言当成泄漏——那不是证据，是一条永远不会为真的「红灯」。
+  // 行尾注释、字符串、真代码全部保留：`const leak = game.puzzle.loop.edgeSet // p.loop`
+  // 这种写法照样命中，所以这条断言没有变弱，只是不再把宣言当读数。
+  const stripLineComments = (s) => s.split('\n').map((l) => (/^\s*\/\//.test(l) ? '' : l)).join('\n');
+  const ANSWER_SRC = 'p\\.loop|\\.edgeSet|ignoreCeiling';
+  const answerRe = new RegExp(ANSWER_SRC); // 判定用（不带 g：带 g 的 .test 会跟着 lastIndex 走）
+  const answerReAll = new RegExp(ANSWER_SRC, 'g'); // 读数用：把命中的到底是哪几个字印出来
+  const answerHitsIn = (name, src) => {
+    const hits = stripLineComments(src).match(answerReAll) || [];
+    return hits.length ? `${name}=${hits.join('/')}` : '';
+  };
+
   // ==========================================================================
   // boot：开屏画面真画出来了 + 答案没漏 + 控件点得到
   // ==========================================================================
@@ -226,11 +240,12 @@
     const srcMain = await (await fetch(new URL('js/main.js', document.baseURI).href)).text();
     const srcGame = await (await fetch(new URL('js/ui/game.js', document.baseURI).href)).text();
     const srcView = await (await fetch(new URL('js/render/board.js', document.baseURI).href)).text();
-    const appSrc = srcMain + srcGame + srcView;
+    const appSrc = stripLineComments(srcMain) + stripLineComments(srcGame) + stripLineComments(srcView);
+    const hitWhere = [answerHitsIn('js/main.js', srcMain), answerHitsIn('js/ui/game.js', srcGame), answerHitsIn('js/render/board.js', srcView)].filter(Boolean).join(' ');
     ck(
       'boot:UI 一侧拿不到答案也没有天花板后门',
-      !/p\.loop|\.edgeSet|ignoreCeiling/.test(appSrc) && g.puzzle === undefined && !('loop' in g) && !('edgeSet' in g),
-      `源码命中=${(appSrc.match(/p\.loop|\.edgeSet|ignoreCeiling/g) || []).join(',') || '无'} game.keys=${Object.keys(g).join(',')}`
+      !answerRe.test(appSrc) && g.puzzle === undefined && !('loop' in g) && !('edgeSet' in g),
+      `源码命中=${hitWhere || '无'} game.keys=${Object.keys(g).join(',')}`
     );
 
     // 命中盒先行：每一条边都点得到自己，每一个按钮都在最上层——
