@@ -26,7 +26,7 @@ import { makeGrid } from './engine/grid.js';
 import { verify, verifySize, CHECK_ORDER, MIN_LOOP_EDGES } from './engine/verify.js';
 import { makePuzzle, TIERS, CEILING } from './engine/generate.js';
 
-const VERSION = '0.2.0-round2a';
+const VERSION = '0.1.0';
 // 一局最多抽几次卡。这是**抽卡次数**的上界，不是毫秒上界——本轮不许新增任何 ms 红线
 // （出货率 tools/census.mjs 量过：4×4 0.73、5×5 0.94、6×6 1.0，连着 24 次不出货的概率是零）。
 const MAX_DRAWS = 24;

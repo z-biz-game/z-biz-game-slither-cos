@@ -1,7 +1,7 @@
 {
   "name": "z-biz-game-slither-cos",
-  "version": "0.0.0-round1",
-  "description": "数回 / Slitherlink (engine-only round 1, kill-or-keep experiment). Reserved dev port pair: HTTP 5277 / CDP 9377 (not started this round).",
+  "version": "0.1.0",
+  "description": "数回 / Slitherlink — 一条闭环，格子里的数字说它四边里有几条。出货的每一局都由独立 DP 计数器数过唯一解，铅笔求解器在零猜测下能推到底；尺寸天花板 6×6 是 tools/ceiling.mjs 量出来的（7×7 出货 p95 4.2~4.5s，浏览器承诺不了）。门禁端口对：HTTP 5277 / CDP 9377。",
   "type": "module",
   "private": true,
   "scripts": {
@@ -16,5 +16,5 @@
     "census": "node tools/census.mjs",
     "golden": "node tools/write-golden.mjs"
   },
-  "license": "UNLICENSED"
+  "license": "MIT"
 }
