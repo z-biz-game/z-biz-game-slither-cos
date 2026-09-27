@@ -436,49 +436,99 @@
   }
 
   // ==========================================================================
-  // resume：存档存的是 seed + 三态串，重载之后接得上同一张盘
+  // resume：存档存的是 seed + 三态串 + 步数，重载之后接得上同一张盘
   // ==========================================================================
   // 这两段之间隔着一次真导航（tools/verify.sh 跑完 resume-set，再带着 #expect= 跑
-  // resume-check，playtest 每次都会重新 navigate）。场景里不放 location.reload()：
+  // resume-check，playtest 每次都重新导航）。场景里不放 location.reload()：
   // 那会把自家的 eval 上下文一起 reload 掉，谁也没法把话说完。
+  //
+  // ⚠ 「重新导航」不等于「换了一个文档」：同一个 URL 只多一个 #expect= 片段时，
+  //   Page.navigate 走的是**同文档片段跳转**，window.slither 还是上一个场景那一个，
+  //   于是 resume-check 量的其实是自己刚画完的那笔——存档根本没被读过。所以 set 侧把
+  //   performance.timeOrigin 一起交出去，check 侧第一件事就是证明两次的 timeOrigin 不同。
+  const SAVE_KEY = 'slither.save.v1';
+
   async function resumeSet() {
     await ready();
     const G = await golden();
     const rec = G.GOLDEN.find((r) => r.w === 5 && r.h === 5);
+    if (!rec) throw new Error('golden 里没有 5×5 的夹具');
     await A().playSeed(rec.seed, tierKeyFor(rec));
-    await playLoop(rec.edges.slice(0, 6), -1);
-    await tapEdge(rec.edges[6], 2);
+    await playLoop(rec.edges.slice(0, 6), -1); // 六笔环
+    await tapEdge(rec.edges[6], 2); // 一支叉：恢复必须连笔记一起接回来
     const g = A().game;
     const marks = g.encode();
-    const raw = JSON.parse(w.localStorage.getItem('slither.save.v1') || '{}');
+    const raw = JSON.parse(w.localStorage.getItem(SAVE_KEY) || '{}');
     const c = counts(g);
+    const st = g.status();
+    const expect = {
+      seed: g.seed,
+      marks,
+      w: g.w,
+      h: g.h,
+      moves: g.moves,
+      clueKey: g.clueKey(),
+      verify: { ok: st.ok, on: st.onCount, off: st.offCount, un: st.unknownCount, len: st.len, fails: st.fails.join('+') },
+      timeOrigin: String(performance.timeOrigin),
+    };
     ck(
-      'resume:落笔之后存档里有这一局（正是 seed + 三态串，没有答案），且 DOM 读数与这一串同数',
-      !!raw.resume && raw.resume.seed === g.seed && raw.resume.marks === marks && !/loop|edgeSet|solution|"clues"/.test(JSON.stringify(raw)) && text('#stat-on') === String(c.on) && text('#stat-off') === String(c.off),
-      `存档=${JSON.stringify(raw.resume || null).slice(0, 200)} DOM=${text('#stat-on')}/${text('#stat-off')} val=${c.on}/${c.off}`
+      'resume-set:落几笔之后存档里就是这一局（seed + 三态串 + 步数，没有答案字段）',
+      !!raw.resume && raw.resume.seed === g.seed && raw.resume.marks === marks && Number(raw.resume.moves) === g.moves &&
+        !/loop|edgeSet|solution|"clues"/.test(JSON.stringify(raw)),
+      `存档=${JSON.stringify(raw.resume || null).slice(0, 220)} 答案字段命中=${(JSON.stringify(raw).match(/loop|edgeSet|solution|"clues"/g) || []).join(',') || '无'}`
     );
-    return report({ expect: { seed: g.seed, marks, w: g.w, h: g.h } });
+    ck(
+      'resume-set:交出去的期望与这一局同数（六笔环一支叉、步数不是 0、题面指纹就是冻结那张、verify 读数=DOM=val）',
+      c.on === 6 && c.off === 1 && g.moves > 0 && expect.moves === g.moves && expect.marks === marks &&
+        g.clueKey() === Int8Array.from(rec.clues).join(',') && text('#stat-on') === String(st.onCount) && text('#stat-off') === String(st.offCount) &&
+        st.onCount === c.on && st.offCount === c.off && countNear(P().accent, 12) > 0 && countNear(P().cross, 12) > 0,
+      `val=${c.on}/${c.off} 想要=6/1 步数=${g.moves} 题面不同=${g.clueKey() !== Int8Array.from(rec.clues).join(',')} DOM=${text('#stat-on')}/${text('#stat-off')} verify=${st.onCount}/${st.offCount} 环色=${countNear(P().accent, 12)} 叉色=${countNear(P().cross, 12)}`
+    );
+    return report({ expect });
   }
 
   async function resumeCheck() {
-    let exp = expectFromHash();
-    if (!exp) exp = {};
+    const exp = expectFromHash() || {};
     await wait(60);
     const a = await ready();
     const g = a.game;
     const st = g.status();
     const c = counts(g);
-    ck('resume:门禁把期望带进了 URL（#expect=），重载之后接上的是同一张盘（seed + 大小 + 每一笔）', exp.marks === g.encode() && !!exp.seed && g.seed === exp.seed && `${g.w}x${g.h}` === `${exp.w}x${exp.h}`, `hash=${location.hash.slice(0, 60)} seed=${g.seed} 想要=${exp.seed} 盘=${g.w}x${g.h} 想要=${exp.w}x${exp.h}`);
+    const v = veilRect();
+    const nAccent = countNear(P().accent, 12);
+    const nCross = countNear(P().cross, 12);
+    const expKeys = Object.keys(exp).length;
+
     ck(
-      'resume:恢复出来的盘既画出来了、DOM 读数也对得上',
-      countNear(P().accent, 12) > 0 && countNear(P().cross, 12) > 0 && text('#stat-on') === String(st.onCount) && st.onCount === c.on && text('#stat-off') === String(st.offCount),
-      `环色=${countNear(P().accent, 12)} 叉色=${countNear(P().cross, 12)} DOM=${text('#stat-on')}/${text('#stat-off')} verify=${st.onCount}/${st.offCount} val=${c.on}/${c.off}`
+      'resume-check:期望从 URL 的 #expect= 进来，而且这一场跑在**另一个文档**里（真导航过，不是同文档改片段）',
+      expKeys > 0 && !!exp.timeOrigin && String(performance.timeOrigin) !== String(exp.timeOrigin),
+      `hash=${location.hash.slice(0, 48)} 期望键=${expKeys} 本场 timeOrigin=${performance.timeOrigin} 上一场=${exp.timeOrigin}`
     );
+    ck(
+      'resume-check:接上的是同一张盘（同 seed、同大小、同题面指纹）',
+      !!exp.seed && g.seed === exp.seed && `${g.w}x${g.h}` === `${exp.w}x${exp.h}` && g.clueKey() === exp.clueKey,
+      `seed=${g.seed} 想要=${exp.seed} 盘=${g.w}x${g.h} 想要=${exp.w}x${exp.h} 题面指纹同=${g.clueKey() === exp.clueKey}`
+    );
+    ck(
+      'resume-check:每一笔都接上了（ON/OFF 逐边同、步数不是 0 且同、verify 的读数与 DOM 与 val 同）',
+      g.encode() === exp.marks && c.on === 6 && c.off === 1 && g.moves > 0 && g.moves === Number(exp.moves) &&
+        !!exp.verify && st.ok === exp.verify.ok && st.onCount === exp.verify.on && st.offCount === exp.verify.off &&
+        st.unknownCount === exp.verify.un && st.len === exp.verify.len && st.fails.join('+') === exp.verify.fails &&
+        text('#stat-on') === String(st.onCount) && text('#stat-off') === String(st.offCount) && text('#stat-moves') === String(g.moves),
+      `val=${c.on}/${c.off} 三态串同=${g.encode() === exp.marks} 步数=${g.moves} 想要=${exp.moves} verify=${JSON.stringify({ ok: st.ok, on: st.onCount, off: st.offCount, len: st.len, fails: st.fails })} 想要=${JSON.stringify(exp.verify || null)} DOM=${text('#stat-on')}/${text('#stat-off')}/${text('#stat-moves')}`
+    );
+    ck(
+      'resume-check:恢复出来的盘真的画在屏幕上半（环色与叉色像素都在，而没赢就不许有横幅）',
+      nAccent > 0 && nCross > 0 && st.ok === false && v.hidden && v.w === 0 && v.h === 0,
+      `环色=${nAccent} 叉色=${nCross} verify.ok=${st.ok} veil=${JSON.stringify(v)}`
+    );
+
     await clickSel('#btn-reset');
-    const after = JSON.parse(w.localStorage.getItem('slither.save.v1') || '{}');
-    eq('resume:清空存档就没有存档了', after.resume, null);
-    return report({ seed: g.seed, marks: g.encode(), on: st.onCount, off: st.offCount });
+    const after = JSON.parse(w.localStorage.getItem(SAVE_KEY) || '{}');
+    eq('resume-check:清空存档就没有存档了', after.resume, null);
+    return report({ seed: g.seed, marks: g.encode(), moves: g.moves, on: st.onCount, off: st.offCount, accentPx: nAccent, crossPx: nCross });
   }
 
-  w.__slitherGate = { boot, render, play, sizes, resumeSet, resumeCheck };
+  // verify.sh 喊的是 resume-set / resume-check（带连字符，日志里读得清），这里就得按那个名字给。
+  w.__slitherGate = { boot, render, play, sizes, 'resume-set': resumeSet, 'resume-check': resumeCheck };
 })(window);

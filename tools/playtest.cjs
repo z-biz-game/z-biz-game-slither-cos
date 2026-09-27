@@ -145,6 +145,12 @@ async function main() {
   } else if (cmd === 'scenario') {
     const src = fs.readFileSync(path.join(__dirname, 'scenarios.js'), 'utf8');
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: src }, sessionId);
+    // ⚠ 先离开这个文档、再进来。URL 只差一个 #fragment 的时候 Page.navigate 走的是**同文档
+    // 片段跳转**：document 不换、window.slither 还是上一个场景那一个、存档根本没被读过
+    // （实测：导航前后 performance.timeOrigin 一模一样，而 hash 已经换掉了）。
+    // resume-set → resume-check 那一对靠的就是「中间真的重载过一次」，同文档跳转会让它变成
+    // 一场自己对自己答案的假绿。每个场景都从一次全新文档开始，读数才各管各的。
+    await navigate('about:blank');
     await navigate(BASE);
     // Headless reports the page as hidden, and the render loop is allowed to skip
     // frames when hidden — so a scenario that waits on animation would time out
