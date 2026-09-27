@@ -1,0 +1,15 @@
+{
+  "name": "z-biz-game-slither-cos",
+  "version": "0.0.0-round1",
+  "description": "数回 / Slitherlink (engine-only round 1, kill-or-keep experiment). Reserved dev port pair: HTTP 5277 / CDP 9377 (not started this round).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "node tools/check.mjs",
+    "test": "node tools/loop-test.mjs && node tools/counter-test.mjs && node tools/pencil-test.mjs && node tools/golden-test.mjs",
+    "ceiling": "node tools/ceiling.mjs",
+    "census": "node tools/census.mjs",
+    "golden": "node tools/write-golden.mjs"
+  },
+  "license": "UNLICENSED"
+}
