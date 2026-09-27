@@ -169,12 +169,20 @@ if [ -n "${SHOTS:-}" ]; then
   # win：整圈点齐再让 verify 裁决——所以卡片里写的环长是 verify 给的，不是文案。
   # 整段包在 IIFE 里：Runtime.evaluate 顶层的 const 会留在这个 tab 的词法作用域里，
   # 第二次跑就变成「已经声明过」。
-  node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await import(new URL('tools/golden.mjs',document.baseURI).href);const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed);for(let i=0;i<Math.floor(r.edges.length/2);i++){const m=a.view.edgeMid(r.edges[i]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}const x=a.view.edgeMid(r.edges[r.edges.length-1]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+x.x,clientY:b.top+x.y,button:2,buttons:2}));return 'ok'})()" nonav >/dev/null 2>&1
+  node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await import(new URL('tools/golden.mjs',document.baseURI).href);const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed, a.engine.TIERS.find((t)=>t.w===r.w&&t.h===r.h).key);for(let i=0;i<Math.floor(r.edges.length/2);i++){const m=a.view.edgeMid(r.edges[i]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}const x=a.view.edgeMid(r.edges[r.edges.length-1]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+x.x,clientY:b.top+x.y,button:2,buttons:2}));return 'ok'})()" nonav >/dev/null 2>&1
   sleep 1
   node tools/playtest.cjs shot "tools/shots/board-$SHOTS.png" >/dev/null
-  node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await import(new URL('tools/golden.mjs',document.baseURI).href);const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed);for(const e of r.edges){const m=a.view.edgeMid(e);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}return a.game.status().ok?'WIN':'NO-WIN'})()" nonav >/dev/null 2>&1
+  SHOTWIN=$(node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await import(new URL('tools/golden.mjs',document.baseURI).href);const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed, a.engine.TIERS.find((t)=>t.w===r.w&&t.h===r.h).key);for(const e of r.edges){const m=a.view.edgeMid(e);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}return a.game.w+'x'+a.game.h+'/'+r.edges.length+'边/'+(a.game.status().ok?'WIN':'NO-WIN')})()" nonav 2>/dev/null | tail -1)
   sleep 1.4
   node tools/playtest.cjs shot "tools/shots/win-$SHOTS.png" >/dev/null
+  # 这一行是修给一个真实存在过的错的：曾经这里调 playSeed(r.seed) 不带档位，于是回落到
+  # "上一场留下的那一档"——跑在 resume-set（5×5）之后，6×6 夹具的边被点到 5×5 盘上，
+  # 截图里的状态行写着「5×5 · 熟练 … 引擎说 没赢」而脚本一声不吭。截图是"自选"的，
+  # 但自选路径也不许交出和产品规则相反的图：几何与裁决都要在这里对账。
+  case "$SHOTWIN" in
+    6x6/*WIN*) echo "  shots/win 几何与裁决对账：$SHOTWIN" ;;
+    *) echo "  FAIL shots/win：要 6×6 且 verify 说赢，拿到的是「${SHOTWIN:-空}」" >&2; FAILED=1 ;;
+  esac
   echo "shots: $(ls tools/shots/*-$SHOTS.png 2>/dev/null | tr '\n' ' ')"
 fi
 
