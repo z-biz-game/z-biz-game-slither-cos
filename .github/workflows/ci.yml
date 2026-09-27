@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: syntax + engine guarantees
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 没有 npm install：运行时零依赖。为了让 CI「什么也不证明」而把 Electron 拉进容器，
+      # 就是让仓库从此开始怕网络抖动。
+      - name: Syntax check every source
+        run: npm run check
+
+      # 真正的门禁：判胜入口的选择性——环不止一条 / 打结 / 带尾巴 / 提示差一 / 空盘 / 少一条边
+      # 都必须被拒，而 golden 参考环必须被收；再往回删掉某一条款，红必须**只**出现在它身上。
+      # 步骤名里不写断言条数：条数是被测对象的性质，写进 CI 就是每次加断言都要改工作流。
+      - name: Independent win verifier (selectivity + per-clause mutation)
+        run: node tools/verify-test.mjs
+
+      - name: Loop facts vs naive cross-check
+        run: node tools/loop-test.mjs
+
+      - name: Exact DP counter vs naive cross-check
+        run: node tools/counter-test.mjs
+
+      - name: Pencil solver (推错了必须为 0)
+        run: node tools/pencil-test.mjs
+
+      - name: Golden fixtures match the frozen records
+        run: node tools/golden-test.mjs
+
+      - name: Entry files exist
+        run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html

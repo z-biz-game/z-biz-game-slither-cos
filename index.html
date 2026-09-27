@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<!-- 不写 <base>：页面既要在 http://host/ 下跑，也要在 GitHub Pages 的 /z-biz-game-slither-cos/
+     前缀下跑。所有资源都用相对路径，动态 import 走 document.baseURI，硬编的 "/" 会在
+     前缀形状下把 css 和引擎全部 404 掉。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#070A14" />
+<title>数回 · Slitherlink</title>
+<meta name="description" content="数回 Slitherlink：照着格子里的数字，把一条条边连成恰好一条不自交的闭环——数字是这一格四条边里在环上的条数。判胜只由引擎里那份独立的 verify 说了算。" />
+<!-- Inline icon: without it the browser probes the domain root for /favicon.ico and logs a 404. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2322304F'/%3E%3Cpath d='M8 8h16v16z' fill='none' stroke='%233A4C78' stroke-width='1'/%3E%3Cpath d='M8 8h16M8 24h16' fill='none' stroke='%23FFC85C' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='24' cy='8' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='8' cy='24' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='24' cy='24' r='2' fill='%235A6E9E'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="css/game.css" />
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>数回</h1>
+      <p class="sub">Slitherlink · 一条闭环</p>
+    </div>
+    <div class="top-actions">
+      <span id="stat-tier" class="chip mono">—</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-game" class="view">
+      <div class="stage">
+        <div class="stage-head">
+          <label class="chip select-chip">尺寸
+            <select id="size-select" aria-label="盘面尺寸（只有档位表里的三档）"></select>
+          </label>
+          <span id="stat-seed" class="chip mono" title="开局用的原始 seed：同一个 seed 永远画同一张盘">seed —</span>
+          <span id="stat-clues" class="chip mono" title="这张盘给了几个数字">数字 —</span>
+        </div>
+
+        <div id="board-wrap">
+          <canvas id="board" role="img"
+            aria-label="数回盘面：左键点一条边把它画到环上，再点一下擦掉；右键点一条边打叉，判定它不在环上"
+            aria-describedby="state-line"></canvas>
+          <!-- 显式的 hidden 规则：#win-veil 平时是 display:grid，会盖掉 UA 的 [hidden]，
+               那等于一块看不见却还在吃点击的 veil。场景量的是它的矩形，不是这个属性。 -->
+          <div id="win-veil" hidden>
+            <div class="win-card">
+              <h3>连成了：恰好一条闭环，每个数字都服帖</h3>
+              <p id="win-meta" class="mono"></p>
+              <p class="win-note">这一句是 <code>js/engine/verify.js</code> 说的，UI 自己没有记分板。</p>
+              <div class="win-actions">
+                <button id="btn-again" class="primary" type="button">再来一局</button>
+                <button id="btn-close-veil" class="ghost" type="button">就看不动</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p id="state-line" class="state-line" aria-live="polite">左键点一条边的中点：画上一段环；再点一下擦掉。右键：打个叉；再点一下取消。</p>
+        <p id="sr-edge" class="sr-only" aria-live="polite"></p>
+      </div>
+
+      <aside class="panel">
+        <div class="acts">
+          <button id="btn-undo" class="ghost" type="button">撤销</button>
+          <button id="btn-clear" class="ghost" type="button">全清</button>
+          <button id="btn-new" class="primary" type="button">新的一局</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><span>环上的边</span><b id="stat-on" class="mono">0</b></div>
+          <div class="stat"><span>打了叉</span><b id="stat-off" class="mono">0</b></div>
+          <div class="stat"><span>还没定</span><b id="stat-unknown" class="mono">0</b></div>
+          <div class="stat"><span>环长</span><b id="stat-len" class="mono">0</b></div>
+          <div class="stat"><span>步数</span><b id="stat-moves" class="mono">0</b></div>
+          <div class="stat"><span>引擎说</span><b id="stat-verify" class="mono">—</b></div>
+        </div>
+
+        <div class="verify-box">
+          <h4>判胜只有一处</h4>
+          <p id="verify-line">「引擎说」和上面那几个计数全部取自 <code>verify()</code> 的返回值——UI 里没有第二份记分板。它说没连上，画面再好看也没赢。</p>
+        </div>
+
+        <h3 class="col-title">这就是全部规则</h3>
+        <ol class="rules">
+          <li>格子上的<b>数字</b>说：这一格的四条边里<b>恰好</b>有这么多条在环上。没写数字的格子不构成约束。</li>
+          <li>所有画上去的边要连成<b>恰好一条</b>闭环：用到的格点度数都是 <b>2</b>，不许有断头，也不许在同一个点上打结（四条边全在环上）。</li>
+          <li>红叉是你自己的<b>笔记</b>：它不参与判定，也不必把每条边都表态——剩下没定的边不影响「赢」这件事的成立。</li>
+        </ol>
+        <p class="rules-note">出货的每一局都由引擎实测过：唯一可解，而且铅笔求解器在零猜测下能推到底（判据见 <code>npm test</code>：规则逐条要有近邻反例、独立计数器与朴素枚举同数、判胜与三位证人对账）。</p>
+
+        <div class="legend">
+          <span><i class="sw sw-on"></i>你画到环上的边</span>
+          <span><i class="sw sw-off"></i>你打叉判定的边</span>
+          <span><i class="sw sw-unknown"></i>还没定的候选边</span>
+          <span><i class="sw sw-clue"></i>提示数字</span>
+          <span><i class="sw sw-dot"></i>格点</span>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>盘面 = <code>makePuzzle()</code> 给的题面（<code>clues</code>，不含答案）+ 引擎的三态边数组 · 判胜 = <code>verify()</code> · 像素与模型的一致性由 <code>tools/verify.sh</code> 在真实 Chrome 里逐条量。</span>
+    <button id="btn-reset" class="link" type="button">清空存档</button>
+  </footer>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

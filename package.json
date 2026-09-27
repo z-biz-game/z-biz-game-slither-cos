@@ -5,8 +5,13 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "start": "node server.cjs",
+    "dev": "node server.cjs 5277",
+    "electron": "electron .",
     "check": "node tools/check.mjs",
     "test": "node tools/loop-test.mjs && node tools/counter-test.mjs && node tools/pencil-test.mjs && node tools/golden-test.mjs && node tools/verify-test.mjs",
+    "playtest": "node tools/playtest.cjs",
+    "verify": "bash tools/verify.sh",
     "ceiling": "node tools/ceiling.mjs",
     "census": "node tools/census.mjs",
     "golden": "node tools/write-golden.mjs"
