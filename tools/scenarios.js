@@ -372,7 +372,7 @@
     // —— 全清（一组可撤销）+ 撤销 ——
     await clickSel('#btn-clear');
     const vCleared = veilRect();
-    ck('play:全清把每一笔归零、横幅收掉、DOM 也跟着归零', blankVal(A().game.val) && num('#stat-on') === 0 && num('#stat-off') === 0 && vCleared.hidden, `val 非空=${!blankVal(A().game.val)} DOM on=${text('#stat-on')} off=${text('#stat-off')} veil=${JSON.stringify(vCleared)}`);
+    ck('play:全清把每一笔归零、横幅收掉、DOM 也跟着归零', blankVal(A().game) && num('#stat-on') === 0 && num('#stat-off') === 0 && vCleared.hidden, `val 非空=${!blankVal(A().game)} DOM on=${text('#stat-on')} off=${text('#stat-off')} veil=${JSON.stringify(vCleared)}`);
     await clickSel('#btn-undo');
     const back = onCount(A().game);
     const e0 = rec.edges[0];
