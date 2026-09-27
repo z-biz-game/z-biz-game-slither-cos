@@ -199,6 +199,23 @@
       `field=${nField} gridLine=${nGrid} dot=${nDot}(下界${grid.D}) 数字格=${clueCell} 墨色=${nInk}`
     );
 
+    // 盘底必须**铺满整张画布**。上面那条是按面积数像素的：roundRect 少一条 arcTo 时
+    // fill() 并不报错，它只是把左上三角留成透明——几十万 field 色像素照样能过比例阈值。
+    // 这八只探针钉在画布四条边内侧（离最近的网格线也有 4px 以上），每一只都必须是盘底色：
+    // 透明像素读回来是 [0,0,0]，面板底是 surface，都和 field 差着 19/27/41 个通道。
+    const ringProbe = (px, py) => {
+      const got = v.pixelAt(px, py);
+      return near(got, rgb(P().field), 8) ? null : `[${Math.round(px)},${Math.round(py)}]=${show3(got)}`;
+    };
+    const W = rect.width, H = rect.height;
+    const ringBad = [
+      ringProbe(10, 30), ringProbe(30, 10),
+      ringProbe(W - 30, 10), ringProbe(W - 10, 30),
+      ringProbe(10, H - 30), ringProbe(30, H - 10),
+      ringProbe(W - 10, H - 30), ringProbe(W - 30, H - 10),
+    ].filter(Boolean);
+    ck('boot:盘底铺满画布（画布四周八只探针取到盘底色，没有透明楔）', ringBad.length === 0, `不像盘底的探针：${ringBad.join(' ')}（field=${P().field}，画布=${Math.round(W)}×${Math.round(H)}）`);
+
     // ⚠ 答案没漏：一笔没画时整张画布上「环色」与「叉色」像素都必须为 0。
     // 这两个颜色在盘上是独占的：只有玩家点出来的 ON 边 / OFF 叉用它们画。
     const nLoop = countNear(P().accent, 12);

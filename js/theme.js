@@ -41,7 +41,10 @@ export const Palette = {
 };
 
 export const Space = { page: 20, card: 16, inner: 12, gutter: 10 };
-export const Radius = { card: 18, button: 12, chip: 8 };
+// 圆角是**几何**令牌：canvas 的 roundRect 和样式表读的是同一组数。
+// ⚠ Radius 的每一支都必须真的存在：board.js 拿 Radius.cell 画盘底，而 arcTo 收到 undefined
+//   时整条路径是非有限的 ⇒ fill() 一个像素都不落。门禁那条「盘面画出来了」量的就是这个。
+export const Radius = { card: 18, cell: 14, button: 12, chip: 8 };
 
 export const Font = {
   mono: "'SF Mono', ui-monospace, SFMono-Regular, Menlo, monospace",

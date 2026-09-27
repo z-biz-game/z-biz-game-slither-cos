@@ -266,12 +266,16 @@ function distToSeg(px, py, a, b) {
   return Math.hypot(px - (a.x + t * vx), py - (a.y + t * vy));
 }
 
+// 四个角、四条边，一条都不能少。⚠ 少一条 arcTo（或把某一段写成 arcTo(x,y,x,y,k) 这种
+// 控制点=终点退化写法）不会报错，它会画出一条**从右下角直插左上角的斜线**当作闭合边：
+// 于是整个盘底的左上三角是透明的，而 fill() 照样"成功"。门禁的环色探针就钉在这块区域上。
 function roundRect(ctx, x, y, w, h, r) {
   const k = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.beginPath();
   ctx.moveTo(x + k, y);
   ctx.arcTo(x + w, y, x + w, y + h, k);
   ctx.arcTo(x + w, y + h, x, y + h, k);
-  ctx.arcTo(x, y, x, y, k);
+  ctx.arcTo(x, y + h, x, y, k);
+  ctx.arcTo(x, y, x + w, y, k);
   ctx.closePath();
 }
