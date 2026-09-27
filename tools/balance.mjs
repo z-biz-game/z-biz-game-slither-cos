@@ -35,6 +35,9 @@
 //   5 墙钟          每盘出题 engine ms 的 p50/p95/max，**绝对值每次必打**。
 //                  这条分布是双峰的（6×6 的 maxMs 6330 对 p95Ms 374 就是那条尾巴），
 //                  所以历史上"中位×2 当 p95 红线"卡出来的 budgetMs 一绿一红：p95 只能实测。
+//                  另外两行是佐证：score↔engine ms 的 Spearman ρ（尾巴到底是"更难"还是"DP 更费"）、
+//                  以及超过本档 budgetMs / p95Ms 常量的抽卡数 —— 只打印不判红，墙钟的红线归
+//                  ceiling.mjs 管，本工具判的是标签的选择性（见下面"判据"）。
 //   6 单调/选择性   相邻两档比尺寸与分数。分数是整数、方差大，所以用**秩**的口径：
 //                  Mann-Whitney AUC = P(高档一盘分数 > 低档一盘分数)（并列算 0.5）。
 //                  AUC=0.5 就是"标签和分数无关"＝掷硬币，标签白挂；
@@ -458,6 +461,17 @@ function printTier(g, { SAMPLES, BUDGET, TIMEOUT }) {
   log(`  最终唯一性核对那一次 DP：p50/p95/max = ${tri(proven.map((r) => r.countMs))}｜峰值状态数 p50/p95/max = ${triRaw(proven.map((r) => r.countStates))}（预算 ${BUDGET}，最高用到 ${proven.length ? ((100 * maxOf(proven.map((r) => r.countStates))) / BUDGET).toFixed(2) : '0'}%）`);
   log(`  挖的过程里 DP 合计：p50/p95/max = ${tri(proven.map((r) => r.dugDpMs))}｜其中单次最贵的一次 DP：p50/p95/max = ${tri(proven.map((r) => r.dugSingleDpMaxMs))}｜峰值状态最大 ${triRaw(proven.map((r) => r.dugDpStatesMax))}`);
   log(`  每张出货代价（全部 ${rs.length} 抽的 engine 时间 ÷ 已证 ${proven.length} 张）= ${proven.length ? ms(sum(allMs) / proven.length) : '—'}（口径同 ceiling 的 perShipMs；这是**均值**不是中位）`);
+  // 尾巴到底是不是"更难"：把每张盘的分数和自己的耗时配成对，看秩相关（同一批样本、同一把尺子）
+  const paired = proven.filter((r) => Number.isFinite(r.finalScore) && Number.isFinite(r.engineMs));
+  const rho = paired.length >= 3 ? spearman(paired.map((r) => r.finalScore), paired.map((r) => r.engineMs)) : NaN;
+  const slowest = [...paired].sort((a, b) => b.engineMs - a.engineMs || a.i - b.i).slice(0, 3);
+  log(`  【尾巴是难度吗】score ↔ engine ms 的 Spearman ρ = ${Number.isFinite(rho) ? rho.toFixed(2) : '—（分数无变化或样本不足）'}｜n=${paired.length}` +
+    `｜最慢 3 张：${slowest.map((r) => `${r.seed} ${Math.round(r.engineMs)}ms/score ${r.finalScore}`).join(' ')}` +
+    `${Number.isFinite(rho) && rho < 0 ? ' ⇒ ρ<0：慢的是"挖这一张盘时 DP 烧得多"，不是"这张盘更烧脑"——墙钟尾巴不能当难度承诺的证据' : ''}`);
+  const overBudget = rs.filter((r) => r.engineMs > t.budgetMs);
+  log(`  【红线核对，只打印不判红】超过本档 budgetMs=${t.budgetMs}ms（浏览器侧超时兜底那个数）的抽卡 ${overBudget.length}/${rs.length}（${pct(overBudget.length, rs.length)}）` +
+    `${overBudget.length ? `：${overBudget.map((r) => `${r.seed} ${Math.round(r.engineMs)}ms`).join(' ')}` : ''}` +
+    `｜超过 TIERS.p95Ms=${t.p95Ms}ms 的抽卡 ${rs.filter((r) => r.engineMs > t.p95Ms).length}/${rs.length}（那个常量是当年另一批 seed 的读数，本跑实测见上）`);
   log(`  outer-engine 差值 max = ${ms(maxOf(rs.map((r) => Math.max(0, r.outerMs - r.engineMs))))}（node 启动+调度，浏览器没有这一段）`);
   log(`  对照 TIERS 里写死的常量（ceiling/census 当年纵向量的读数）：`);
   log(`    shipRate 常量 ${t.shipRate} ↔ 本跑实测（已证）${pct(proven.length, rs.length)}；shipped ${pct(shippedRecs.length, rs.length)}`);
@@ -474,6 +488,42 @@ function printTier(g, { SAMPLES, BUDGET, TIMEOUT }) {
 function round2(x) {
   return Math.round(x * 100) / 100;
 }
+
+// 秩（并列取平均秩；比较器是数值 + 下标兜底，绝对不抽随机数）
+function ranks(a) {
+  const idx = a.map((v, i) => [v, i]).sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  const r = new Array(a.length);
+  let i = 0;
+  while (i < idx.length) {
+    let j = i;
+    while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
+    const avg = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) r[idx[k][1]] = avg;
+    i = j + 1;
+  }
+  return r;
+}
+
+function pearson(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return NaN;
+  const mx = sum(xs) / n;
+  const my = sum(ys) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx;
+    const dy = ys[i] - my;
+    sxy += dx * dy;
+    sxx += dx * dx;
+    syy += dy * dy;
+  }
+  if (!sxx || !syy) return NaN;
+  return sxy / Math.sqrt(sxx * syy);
+}
+
+const spearman = (xs, ys) => pearson(ranks(xs), ranks(ys));
 
 // ---- 6 档间比较 ----
 function printCross(tiers, BAR_AUC, MIN_PROVEN) {
