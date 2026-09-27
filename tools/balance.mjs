@@ -372,7 +372,7 @@ function printTier(g, { SAMPLES, BUDGET, TIMEOUT }) {
   // ---- 1 出货率 ----
   log(`[1] 出货率 / 抽卡分布`);
   log(`  shipped ${shippedRecs.length}/${rs.length}（${pct(shippedRecs.length, rs.length)}）｜其中**已证唯一解** ${proven.length}/${rs.length}（${pct(proven.length, rs.length)}）｜抽卡失败 ${rejected.length}，超时 ${timeouts.length}，崩 ${crashes.length}`);
-  log(`  拒绝原因：${JSON.stringify(reasons)}${rejected.length ? `｜失败盘的未知边数 unknownAtSt=${triRaw(rejected.map((r) => r.unknownAtStall).filter(Number.isFinite))}` : ''}`);
+  log(`  拒绝原因：${JSON.stringify(reasons)}${rejected.length ? `｜失败盘的未知边数 unknownAtStall = ${triRaw(rejected.map((r) => r.unknownAtStall).filter(Number.isFinite))}（p50/p95/max）` : ''}`);
   const upSeeds = unproven.map((r) => `${r.seed}(${r.overbudget ? 'overbudget' : r.count !== 1 ? `count=${r.count}` : `pencil=${r.finalStatus}`})`);
   log(`  【破口】shipped-but-unproven ${unproven.length} 张${unproven.length ? `：${upSeeds.join(' ')}` : '（零）'} ⇒ 这些绝不进上面那个"已证"分母分子`);
   const finalOver = shippedRecs.filter((r) => r.overbudget).length;
@@ -394,10 +394,10 @@ function printTier(g, { SAMPLES, BUDGET, TIMEOUT }) {
     `｜平均 ${ships ? (rs.length / ships).toFixed(2) : '∞'} 抽/张（=${rs.length} 抽 / ${ships} 张已证）｜首抽即中的比例 ${pct(gaps.filter((x) => x === 1).length, gaps.length)}`);
   const triesLeft = ships ? rs.length - last : rs.length;
   if (triesLeft) log(`  （末尾还压着 ${triesLeft} 抽没出盘 ⇒ 上面那个"平均抽/张"在 SAMPLES=${SAMPLES} 的窗口里是**下**界，别当上界引）`);
-  log(`  每张盘内部挖除探针次数 tried：${triRaw(shippedRecs.map((r) => r.dugTried).filter(Number.isFinite))}（min/中/max 同上口径 p50/p95/max）` +
+  log(`  每张盘内部挖除探针次数 tried（=该盘开局有几个数字，逐个试删）：p50/p95/max = ${triRaw(shippedRecs.map((r) => r.dugTried).filter(Number.isFinite))}` +
     `｜kept/tried 整体 ${pct(sum(shippedRecs.map((r) => r.dugKept || 0)), sum(shippedRecs.map((r) => r.dugTried || 0)))}` +
     `｜被铅笔挡回 ${sum(shippedRecs.map((r) => r.dugRejPencil || 0))}｜被"不止一解"挡回 ${sum(shippedRecs.map((r) => r.dugRejCount || 0))}`);
-  log(`  环采样重试 loopTries：${triRaw(shippedRecs.map((r) => r.loopTries).filter(Number.isFinite))}`);
+  log(`  环采样重试 loopTries：p50/p95/max = ${triRaw(shippedRecs.map((r) => r.loopTries).filter(Number.isFinite))}`);
 
   // ---- 2 零猜测可解率 ----
   log(`[2] 零猜测可解率（铅笔：js/engine/pencil.js，规则表固定顺序、无猜测无回溯）`);
