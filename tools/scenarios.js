@@ -302,12 +302,29 @@
       `DOM=${text('#stat-on')}/${text('#stat-off')}/${text('#stat-unknown')} verify=${st.onCount}/${st.offCount}/${st.unknownCount} val=${raw.on}/${raw.off}/${raw.un} E=${grid.E}`
     );
 
-    // 两只手各管各的：左键再点同一条回到未知；左键不许擦右键画的叉
+    // 两只手各管各的，拆成两句诚实的话——不改产品语义去迁就夹具。
+    // ① 左键再点**自己画的那条**：擦回未知；别人身上那支叉一个像素都不许动——这才叫不越界。
     await tapEdge(e1, 0);
     const p1b = sample(midOf(e1));
-    await tapEdge(e2, 0);
-    ck('render:左键再点同一条会擦掉，且不越界去擦别人的叉', g.val[e1] === E().UNKNOWN && !near(p1b, loopRgb) && g.val[e2] === E().OFF, `val[e1]=${g.val[e1]} 想要 ${E().UNKNOWN}；e1 中点=${show3(p1b)}；val[e2]=${g.val[e2]} 想要 ${E().OFF}`);
+    const p2b = sample(midOf(e2));
+    ck(
+      'render:左键再点同一条会擦回未知，而且不碰别的边',
+      g.val[e1] === E().UNKNOWN && !near(p1b, loopRgb) && g.val[e2] === E().OFF && near(p2b, crossRgb),
+      `val[e1]=${g.val[e1]} 想要 ${E().UNKNOWN}；e1 中点=${show3(p1b)}；e2 这一路没被点过：val[e2]=${g.val[e2]} 想要 ${E().OFF}，中点=${show3(p2b)} 想要 ${show3(crossRgb)}`
+    );
 
+    // ② 左键落在**别人画的叉**上：tapOn 的规则是「ON→未知，其余→ON」，所以这一下是覆盖成环段，
+    //   不是把叉擦成空。撤销必须退回「那个叉」——栈里存的是 prev 值，不是「擦成 UNKNOWN」。
+    await tapEdge(e2, 0);
+    const valOnCross = g.val[e2];
+    const p2c = sample(midOf(e2));
+    await clickSel('#btn-undo');
+    const p2d = sample(midOf(e2));
+    ck(
+      'render:左键在叉上落笔是覆盖成 ON（不是擦成 UNKNOWN），撤销之后回到那个叉',
+      valOnCross === E().ON && near(p2c, loopRgb) && g.val[e2] === E().OFF && near(p2d, crossRgb),
+      `点下去 val=${valOnCross} 想要 ${E().ON}，中点=${show3(p2c)} 想要 ${show3(loopRgb)}；撤销后 val=${g.val[e2]} 想要 ${E().OFF}，中点=${show3(p2d)} 想要 ${show3(crossRgb)}`
+    );
     return report({ e1, e2, on: st.onCount, off: st.offCount });
   }
 
