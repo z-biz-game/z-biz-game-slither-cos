@@ -43,10 +43,13 @@ for (const [w, h] of SIZES) {
   const fullSteps = [];
   let rejected = {};
   const monoProbes = []; // 全提示盘推不完的样本：拿它们核对"挖完只会更推不动"这条单调性
+  const drawMs = []; // 每一次抽卡自己的墙钟（含没出货的）——中位/p95 只能从这个分布里算
   while (recs.length < N_SHIP && cand < N_SHIP * 8) {
     const seed = `${w}x${h}#${cand}`;
     cand++;
+    const c0 = Date.now();
     const p = makePuzzle({ w, h, seed });
+    drawMs.push(Date.now() - c0);
     if (!p.shipped) {
       rejected[p.reason] = (rejected[p.reason] || 0) + 1;
       if (p.reason === 'full_board_stall' || p.reason === 'full_board_contradiction') {
@@ -94,7 +97,10 @@ for (const [w, h] of SIZES) {
     `  【命门】全提示盘铅笔可完率 = ${pct(fullOK, cand)}（${fullOK}/${cand}）。推不完的全提示盘：步数中位 ${med(fullSteps)}，` +
       `卡住时未知边数 ${fullStallUnknown.length ? spread(fullStallUnknown) : '（无）'}`
   );
-  console.log(`  总墙钟 ${wall.toFixed(1)}s，每张盘中位 ${recs.length ? (wall * 1000 / recs.length).toFixed(0) : 0}ms`);
+  console.log(
+    `  总墙钟 ${wall.toFixed(1)}s；每张候选盘墙钟 中位 ${med(drawMs)}ms / p95 ${q(drawMs, 95)}ms / max ${Math.max(...drawMs)}ms（${drawMs.length} 抽的真分布）；` +
+      `每张出货盘摊销 ${recs.length ? (wall * 1000 / recs.length).toFixed(0) : 0}ms —— 这一列是**均值**（总墙钟 ÷ 出货张数，把被拒的抽卡也摊进去了），不是中位数`
+  );
   if (!monoProbes.length) {
     console.log('  【单调性核对】本尺寸没有"全提示盘推不完"的候选，无违反可测（挖的过程中每张盘都被铅笔门重跑过一遍）。');
   } else {
