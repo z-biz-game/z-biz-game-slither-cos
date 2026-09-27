@@ -35,7 +35,8 @@
 //   5 墙钟          每盘出题 engine ms 的 p50/p95/max，**绝对值每次必打**。
 //                  这条分布是双峰的（6×6 的 maxMs 6330 对 p95Ms 374 就是那条尾巴），
 //                  所以历史上"中位×2 当 p95 红线"卡出来的 budgetMs 一绿一红：p95 只能实测。
-//                  另外两行是佐证：score↔engine ms 的 Spearman ρ（尾巴到底是"更难"还是"DP 更费"）、
+//                  另外两行是佐证：score↔engine ms 的 Spearman ρ（尾巴到底是"更难"还是"DP 更费"；
+//                  本档耗时跨度不足 50ms 时会自动附一句"ρ 只当方向看"，因为负载噪声就够把秩重排）、
 //                  以及超过本档 budgetMs / p95Ms 常量的抽卡数 —— 只打印不判红，墙钟的红线归
 //                  ceiling.mjs 管，本工具判的是标签的选择性（见下面"判据"）。
 //   6 单调/选择性   相邻两档比尺寸与分数。分数是整数、方差大，所以用**秩**的口径：
@@ -465,9 +466,12 @@ function printTier(g, { SAMPLES, BUDGET, TIMEOUT }) {
   const paired = proven.filter((r) => Number.isFinite(r.finalScore) && Number.isFinite(r.engineMs));
   const rho = paired.length >= 3 ? spearman(paired.map((r) => r.finalScore), paired.map((r) => r.engineMs)) : NaN;
   const slowest = [...paired].sort((a, b) => b.engineMs - a.engineMs || a.i - b.i).slice(0, 3);
+  const spreadMs = paired.length ? maxOf(paired.map((r) => r.engineMs)) - minOf(paired.map((r) => r.engineMs)) : NaN;
   log(`  【尾巴是难度吗】score ↔ engine ms 的 Spearman ρ = ${Number.isFinite(rho) ? rho.toFixed(2) : '—（分数无变化或样本不足）'}｜n=${paired.length}` +
     `｜最慢 3 张：${slowest.map((r) => `${r.seed} ${Math.round(r.engineMs)}ms/score ${r.finalScore}`).join(' ')}` +
-    `${Number.isFinite(rho) && rho < 0 ? ' ⇒ ρ<0：慢的是"挖这一张盘时 DP 烧得多"，不是"这张盘更烧脑"——墙钟尾巴不能当难度承诺的证据' : ''}`);
+    `${Number.isFinite(rho) && rho < 0 ? ' ⇒ ρ<0：慢的是"挖这一张盘时 DP 烧得多"，不是"这张盘更烧脑"——墙钟尾巴不能当难度承诺的证据' : ''}` +
+    `${Number.isFinite(spreadMs) && spreadMs < 50 ? ` ⇒ 注：本档 engine ms 全落在 ${Math.round(minOf(paired.map((r) => r.engineMs)))}~${Math.round(maxOf(paired.map((r) => r.engineMs)))}ms（跨度 ${Math.round(spreadMs)}ms），` +
+      `负载噪声就够把秩重排一遍，这一档的 ρ 只当方向看、别当读数（normal/hard 有两三个数量级的跨度，那里的 ρ 才站得住）` : ''}`);
   const overBudget = rs.filter((r) => r.engineMs > t.budgetMs);
   log(`  【红线核对，只打印不判红】超过本档 budgetMs=${t.budgetMs}ms（浏览器侧超时兜底那个数）的抽卡 ${overBudget.length}/${rs.length}（${pct(overBudget.length, rs.length)}）` +
     `${overBudget.length ? `：${overBudget.map((r) => `${r.seed} ${Math.round(r.engineMs)}ms`).join(' ')}` : ''}` +
