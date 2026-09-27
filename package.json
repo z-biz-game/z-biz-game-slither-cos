@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "check": "node tools/check.mjs",
-    "test": "node tools/loop-test.mjs && node tools/counter-test.mjs && node tools/pencil-test.mjs && node tools/golden-test.mjs",
+    "test": "node tools/loop-test.mjs && node tools/counter-test.mjs && node tools/pencil-test.mjs && node tools/golden-test.mjs && node tools/verify-test.mjs",
     "ceiling": "node tools/ceiling.mjs",
     "census": "node tools/census.mjs",
     "golden": "node tools/write-golden.mjs"
