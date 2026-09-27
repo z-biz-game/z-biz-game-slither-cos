@@ -7,8 +7,13 @@
 //   node tools/playtest.cjs eval '<expr>'       evaluate, await promises, print result
 //   node tools/playtest.cjs eval '<expr>' nonav don't navigate first
 //   node tools/playtest.cjs scenario <name>     inject tools/scenarios.js, run __slitherGate.<name>()
+//   node tools/playtest.cjs --only <name>       只跑一个场景，且**一行人类可读的读数都不印**
+//                                               （门禁的变异证据用它：改坏夹具之后只想知道红没红）
 //   node tools/playtest.cjs shot <file.png>
 //   node tools/playtest.cjs logs
+//
+// 注入顺序是有讲究的：__slitherGolden 在 scenarios.js **之前**装进新文档，所以场景里的
+// golden() 一调用就有；少一个都会变成「场景自己没跑起来」而不是「夹具丢了」。
 //
 // Which page to attach to is decided by BASE_URL's **origin**, never by a hard-coded port:
 // an `eval` that silently lands on an about:blank target reads like a broken deploy.
@@ -26,6 +31,24 @@ const cmd = process.argv[2];
 const arg = process.argv[3];
 const rest = process.argv[4];
 const isOurs = (u) => typeof u === 'string' && u.startsWith(ORIGIN);
+
+// 夹具由驱动器带进页面。
+//
+// tools/golden.mjs 里躺着每张出货盘的参考环边集，pages.yml 刻意不把 tools/ 部署上线——
+// 「玩家唯一的判胜入口读不到答案」这条纪律就只剩自觉了。所以让页面去 fetch 它（旧写法：
+// import(new URL('tools/golden.mjs', document.baseURI))）在线上必然 404，而 404 之后门禁
+// 只会少跑几条断言，看起来像"生产环境测不出来的东西"。现在三个 URL 形态吃的是**同一批字节**：
+// 本地根、Pages 前缀、线上站点，都是磁盘上这个文件的原文，和 node 侧 golden-test 读的同一份。
+const GOLDEN_SRC = fs.readFileSync(path.join(__dirname, 'golden.mjs'), 'utf8');
+const GOLDEN_LOADER =
+  'globalThis.__slitherGolden = async () => {\n' +
+  `  const src = ${JSON.stringify(GOLDEN_SRC)};\n` +
+  '  const m = await import(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));\n' +
+  '  if (!Array.isArray(m.GOLDEN) || !m.GOLDEN.length || typeof m.fingerprintOf !== "function") {\n' +
+  '    throw new Error("golden 夹具形状不对：GOLDEN 或 fingerprintOf 少了一个");\n' +
+  '  }\n' +
+  '  return m;\n' +
+  '};';
 
 const logs = [];
 
@@ -112,6 +135,7 @@ async function main() {
   await cdp.send('Runtime.enable', {}, sessionId);
   await cdp.send('Log.enable', {}, sessionId);
   await cdp.send('Page.enable', {}, sessionId);
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: GOLDEN_LOADER }, sessionId);
 
   const evaluate = async (expression) => {
     const r = await cdp.send(
@@ -134,6 +158,34 @@ async function main() {
     }
   };
 
+  // 场景 = 注入 tools/scenarios.js、从一次全新文档开始、跑那一个函数、把报告取回来。
+  // scenario 和 --only 两条命令共用这一手，区别只在**怎么把结果交出去**：前者打 RESULT 一行
+  // 给门禁的解析器读，后者逐条打 FAIL 并用退出码说话（变异证据要的就是这个）。
+  //
+  // ⚠ 先离开这个文档、再进来。URL 只差一个 #fragment 的时候 Page.navigate 走的是**同文档
+  // 片段跳转**：document 不换、window.slither 还是上一个场景那一个、存档根本没被读过
+  // （实测：导航前后 performance.timeOrigin 一模一样，而 hash 已经换掉了）。
+  // resume-set → resume-check 那一对靠的就是「中间真的重载过一次」，同文档跳转会让它变成
+  // 一场自己对自己答案的假绿。每个场景都从一次全新文档开始，读数才各管各的。
+  async function runScenario(name) {
+    const src = fs.readFileSync(path.join(__dirname, 'scenarios.js'), 'utf8');
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: src }, sessionId);
+    await navigate('about:blank');
+    await navigate(BASE);
+    // Headless reports the page as hidden, and the render loop is allowed to skip
+    // frames when hidden — so a scenario that waits on animation would time out
+    // against a browser that is only pretending to be in the background.
+    await evaluate(`Object.defineProperty(document,'hidden',{get:()=>false,configurable:true});
+      Object.defineProperty(document,'visibilityState',{get:()=>'visible',configurable:true});'ok'`);
+    return await evaluate(`(async()=>{
+      if (!window.__slitherGate) throw new Error('scenarios.js never installed');
+      const fn = window.__slitherGate[${JSON.stringify(name)}];
+      if (typeof fn !== 'function') throw new Error('no such scenario: ' + ${JSON.stringify(name)});
+      const r = await fn();
+      return JSON.stringify(r);
+    })()`);
+  }
+
   if (cmd === 'open') {
     await navigate(arg || BASE);
     await sleep(400);
@@ -142,28 +194,17 @@ async function main() {
     if (rest !== 'nonav') await navigate(BASE);
     const out = await evaluate(arg);
     console.log(typeof out === 'string' ? out : JSON.stringify(out));
+  } else if (cmd === '--only') {
+    const out = await runScenario(arg);
+    // 变异证据只要一件事：红没红。逐条打出来，让人（和 shell）看得见是哪一条。
+    if (logs.length) console.error(logs.slice(-40).join('\n'));
+    const parsed = JSON.parse(out);
+    for (const r of parsed.rows) if (!r.pass) console.log(`FAIL ${r.test} :: ${r.detail}`);
+    console.log(`ONLY ${arg}: ${parsed.rows.length} checks, ${parsed.fail} failed`);
+    ws.close();
+    process.exit(parsed.fail ? 1 : 0);
   } else if (cmd === 'scenario') {
-    const src = fs.readFileSync(path.join(__dirname, 'scenarios.js'), 'utf8');
-    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: src }, sessionId);
-    // ⚠ 先离开这个文档、再进来。URL 只差一个 #fragment 的时候 Page.navigate 走的是**同文档
-    // 片段跳转**：document 不换、window.slither 还是上一个场景那一个、存档根本没被读过
-    // （实测：导航前后 performance.timeOrigin 一模一样，而 hash 已经换掉了）。
-    // resume-set → resume-check 那一对靠的就是「中间真的重载过一次」，同文档跳转会让它变成
-    // 一场自己对自己答案的假绿。每个场景都从一次全新文档开始，读数才各管各的。
-    await navigate('about:blank');
-    await navigate(BASE);
-    // Headless reports the page as hidden, and the render loop is allowed to skip
-    // frames when hidden — so a scenario that waits on animation would time out
-    // against a browser that is only pretending to be in the background.
-    await evaluate(`Object.defineProperty(document,'hidden',{get:()=>false,configurable:true});
-      Object.defineProperty(document,'visibilityState',{get:()=>'visible',configurable:true});'ok'`);
-    const out = await evaluate(`(async()=>{
-      if (!window.__slitherGate) throw new Error('scenarios.js never installed');
-      const fn = window.__slitherGate[${JSON.stringify(arg)}];
-      if (typeof fn !== 'function') throw new Error('no such scenario: ' + ${JSON.stringify(arg)});
-      const r = await fn();
-      return JSON.stringify(r);
-    })()`);
+    const out = await runScenario(arg);
     // Console noise first, machine-readable line last: the parser in verify.sh takes the
     // final RESULT line, so a stray '{' in a log cannot hijack the report.
     if (logs.length) console.error(logs.slice(-40).join('\n'));

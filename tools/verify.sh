@@ -54,6 +54,8 @@ if [ "$LOCAL" = 1 ]; then
 fi
 SPID=0
 PSPID=0
+# 变异证据的备份路径；cleanup 认它，所以脚本中途被打断也不会把改坏的夹具留在磁盘上。
+MUTBAK=""
 if [ "$LOCAL" = 1 ]; then
   node "$HERE/server.cjs" "$HTTP" >/tmp/slither-server.log 2>&1 &
   SPID=$!
@@ -70,11 +72,17 @@ echo "$SERVED" | grep -q 数回 || { echo "port $HTTP is serving a different app
 echo "$SERVED" | grep -qi slither || { echo "port $HTTP is serving a different app, not 数回 Slitherlink" >&2; exit 2; }
 
 UDD=$(mktemp -d)
+MUTBAK="$UDD/golden.mjs.orig"
 "$CHROME" --headless=new --remote-debugging-port=$PORT --user-data-dir=$UDD \
   --window-size=980,1040 --no-first-run --no-default-browser-check about:blank >/tmp/slither-chrome.log 2>&1 &
 CPID=$!
 disown
 cleanup() {
+  # 变异证据跑到一半被打断（超时 watchdog 也算）也要先把冻结夹具按字节放回去：
+  # 备份就在 UDD 里，rm -rf 一跑就再没有第二次机会了。
+  if [ -f "$MUTBAK" ]; then
+    node "$HERE/tools/golden-mutate.mjs" restore "$MUTBAK" >/dev/null 2>&1
+  fi
   [ "$SPID" != 0 ] && kill $SPID 2>/dev/null
   [ "$PSPID" != 0 ] && kill $PSPID 2>/dev/null
   kill -9 $CPID 2>/dev/null
@@ -163,16 +171,63 @@ else
   run resume-check "$BASE#expect=$ENC"
 fi
 
+# ── 变异证据：夹具的边号改坏一个，浏览器那一腿必须红，然后按字节还原再确认它回到绿 ──
+# 这一手专门对着"页面其实拿自己的引擎现算参考环"那种假绿：如果 play / resume-set 对的是
+# 磁盘上这批冻结字节给出的边集，把其中一个边号换成同盘面上的另一条合法边就一定赢不了；
+# 如果页面对的是自己算出来的那条环，改 golden.mjs 不会有任何反应，而这就是没证到的那件事。
+# 只在本地跑：这一步改的是磁盘上的文件，拿它去量线上站点没有意义（线上那趟吃的是同一批字节，
+# 由上面的三形态 + 这里的 RED/GREEN 一起说明）。SKIP_MUTATION=1 跳过。
+if [ "$LOCAL" = 1 ] && [ "${SKIP_MUTATION:-0}" != 1 ]; then
+  echo "=== fixture-mutation ==="
+  MUTOUT=$(node tools/golden-mutate.mjs apply "$MUTBAK" 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "  FAIL 夹具没能被改坏：$MUTOUT" >&2
+    FAILED=1
+  else
+    echo "  $MUTOUT"
+    # 红/绿两趟都把「哪一条、什么读数」留在输出里：只宣布"红了"等于把证据又变回一次自觉。
+    REDOUT=$(node tools/playtest.cjs --only play 2>&1)
+    if [ $? -eq 0 ]; then
+      echo "  FAIL 改坏冻结边号之后 play 场景照样绿 —— 页面参考的不是磁盘上那批字节" >&2
+      echo "$REDOUT" | sed 's/^/       /' >&2
+      FAILED=1
+    else
+      echo "  RED AS EXPECTED（这条腿确实在吃冻结边号）："
+      echo "$REDOUT" | grep -E '^(FAIL|ONLY)' | sed 's/^/       /'
+    fi
+    RST=$(node tools/golden-mutate.mjs restore "$MUTBAK" 2>&1)
+    if [ $? -ne 0 ]; then echo "  FAIL 还原失败：$RST" >&2; FAILED=1; else echo "  $RST"; fi
+    rm -f "$MUTBAK"
+    # 还原的第二道证据不是 cmp 而是 golden 自己的闸：89 条对账（含每张出货盘的边集与指纹）
+    # 重新绿一次，才说明磁盘上那份夹具还是原来那一份。
+    if ! GT=$(node tools/golden-test.mjs 2>&1); then
+      echo "  FAIL 还原之后 golden-test 没回到全绿：" >&2
+      echo "$GT" | tail -6 | sed 's/^/       /' >&2
+      FAILED=1
+    else
+      echo "  $(echo "$GT" | grep -E '通过|失败' | tail -1 | sed 's/^ *//')"
+    fi
+    GREENOUT=$(node tools/playtest.cjs --only play 2>&1)
+    if [ $? -ne 0 ]; then
+      echo "  FAIL 还原之后 play 还是红的 —— 变异这一手没走干净" >&2
+      echo "$GREENOUT" | grep -E '^(FAIL|ONLY)' | sed 's/^/       /' >&2
+      FAILED=1
+    else
+      echo "  GREEN AFTER RESTORE：$(echo "$GREENOUT" | grep -E '^ONLY')"
+    fi
+  fi
+fi
+
 if [ -n "${SHOTS:-}" ]; then
   mkdir -p tools/shots
   # board：golden 环点一半（玩家打到一半、还没连上的样子，红叉也来一笔）。
   # win：整圈点齐再让 verify 裁决——所以卡片里写的环长是 verify 给的，不是文案。
   # 整段包在 IIFE 里：Runtime.evaluate 顶层的 const 会留在这个 tab 的词法作用域里，
   # 第二次跑就变成「已经声明过」。
-  node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await import(new URL('tools/golden.mjs',document.baseURI).href);const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed, a.engine.TIERS.find((t)=>t.w===r.w&&t.h===r.h).key);for(let i=0;i<Math.floor(r.edges.length/2);i++){const m=a.view.edgeMid(r.edges[i]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}const x=a.view.edgeMid(r.edges[r.edges.length-1]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+x.x,clientY:b.top+x.y,button:2,buttons:2}));return 'ok'})()" nonav >/dev/null 2>&1
+  node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await window.__slitherGolden();const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed, a.engine.TIERS.find((t)=>t.w===r.w&&t.h===r.h).key);for(let i=0;i<Math.floor(r.edges.length/2);i++){const m=a.view.edgeMid(r.edges[i]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}const x=a.view.edgeMid(r.edges[r.edges.length-1]);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+x.x,clientY:b.top+x.y,button:2,buttons:2}));return 'ok'})()" nonav >/dev/null 2>&1
   sleep 1
   node tools/playtest.cjs shot "tools/shots/board-$SHOTS.png" >/dev/null
-  SHOTWIN=$(node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await import(new URL('tools/golden.mjs',document.baseURI).href);const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed, a.engine.TIERS.find((t)=>t.w===r.w&&t.h===r.h).key);for(const e of r.edges){const m=a.view.edgeMid(e);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}return a.game.w+'x'+a.game.h+'/'+r.edges.length+'边/'+(a.game.status().ok?'WIN':'NO-WIN')})()" nonav 2>/dev/null | tail -1)
+  SHOTWIN=$(node tools/playtest.cjs eval "(async()=>{const a=window.slither;const G=await window.__slitherGolden();const r=G.GOLDEN.find(x=>x.w===6&&x.h===6);await a.playSeed(r.seed, a.engine.TIERS.find((t)=>t.w===r.w&&t.h===r.h).key);for(const e of r.edges){const m=a.view.edgeMid(e);const b=a.view.canvas.getBoundingClientRect();a.view.canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}));a.view.canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:b.left+m.x,clientY:b.top+m.y,button:0}))}return a.game.w+'x'+a.game.h+'/'+r.edges.length+'边/'+(a.game.status().ok?'WIN':'NO-WIN')})()" nonav 2>/dev/null | tail -1)
   sleep 1.4
   node tools/playtest.cjs shot "tools/shots/win-$SHOTS.png" >/dev/null
   # 这一行是修给一个真实存在过的错的：曾经这里调 playSeed(r.seed) 不带档位，于是回落到

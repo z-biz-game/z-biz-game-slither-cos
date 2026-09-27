@@ -19,8 +19,8 @@
 // 这里一行就是一句话，合得上就合、合不上就删——写不出变异证据的断言不留。
 //
 // window.slither.engine 就是玩家加载的那张模块图，所以这里绿一次，等于页面那侧的出题器/
-// 几何/判胜同时绿一次。夹具全部来自 tools/golden.mjs 的冻结数据（页面用 document.baseURI
-// 动态 import；Pages 只发 index.html/css/js，fixture 不上线）。
+// 几何/判胜同时绿一次。夹具全部来自 tools/golden.mjs 的冻结数据，由 playtest.cjs 随本文件一起
+// 带进页面（Pages 只发 index.html/css/js，fixture 不上线，页面也不该去线上 fetch 它）。
 //
 // ⚠ 游玩路径不许读 p.loop：注入参考环的方式是「按 seed 把页面切到那张盘」+
 //   「用冻结的边号算出屏幕中点」+「派发真指针事件」。测试没有任何一条路把答案写进模型，
@@ -121,7 +121,18 @@
     }
   }
 
-  const golden = () => import(new URL('tools/golden.mjs', document.baseURI).href);
+  // 夹具不靠页面去 fetch：tools/ 不在 Pages 的部署名单里（答案不能上线），线上那趟 fetch
+  // 只会拿到 404，然后把 play / resume 两条腿一起变成"少跑了几条断言的绿色"。
+  // __slitherGolden 由驱动器在文档建立之前就装好，所以三个 URL 形态吃的是同一批冻结字节。
+  let goldenMod = null;
+  const golden = async () => {
+    if (goldenMod) return goldenMod;
+    if (typeof w.__slitherGolden !== 'function') {
+      throw new Error('页面上没有 __slitherGolden —— 这个场景必须由 tools/playtest.cjs 注入跑（它把 tools/golden.mjs 一起带进来）');
+    }
+    goldenMod = await w.__slitherGolden();
+    return goldenMod;
+  };
   // 夹具 → 档位 key：只从 TIERS 里查，查不到就当场抛。测试不许绕过档位表把页面切到
   // 表外的尺寸上（playSeed 那侧也只认表内的 key）。
   const tierKeyFor = (rec) => {
