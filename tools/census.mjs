@@ -60,7 +60,11 @@ for (const [w, h] of SIZES) {
       continue;
     }
     fullOK++;
-    fullSteps.push(p.loop.fullSteps);
+    // fullSteps 在出货对象的**顶层**（generate.js:241），不在 p.loop 上（loop 的键是
+    // ok,w,h,seed,edges,edgeSet,clues,region,tries —— 实测 'fullSteps' in p.loop === false）。
+    // 原来这里写 p.loop.fullSteps：不抛错，只往 fullSteps 里塞 undefined，于是下面第 97 行那句
+    // "推不完的全提示盘：步数中位 med(fullSteps)" 把 24 个 undefined 混进分母，整句话静默变 NaN。
+    fullSteps.push(p.fullSteps);
     recs.push({
       seed,
       genTries: p.loop.tries, // 采样重试次数（生成侧）

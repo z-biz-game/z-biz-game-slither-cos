@@ -404,7 +404,7 @@ function printTier(g, { SAMPLES, BUDGET, TIMEOUT }) {
   log(`[2] 零猜测可解率（铅笔：js/engine/pencil.js，规则表固定顺序、无猜测无回溯）`);
   const solvedShipped = shippedRecs.filter((r) => r.finalStatus === 'solved').length;
   log(`  出货盘（已证那 ${proven.length} 张）铅笔从空盘推到底：${proven.filter((r) => r.finalStatus === 'solved').length}/${proven.length}（${pct(proven.filter((r) => r.finalStatus === 'solved').length, proven.length)}）`);
-  log(`    ⚠ 这一条是**流水线的定义**，不是独立闸：dig 只保留"铅笔推得完"的删除（generate.js:154-157），出货盘按构造必零回溯。`);
+  log(`    ⚠ 这一条是**流水线的定义**，不是独立闸：dig 只保留"铅笔推得完"的删除（generate.js 里 dig 的 rejectedPencil++ 那一支，现 :163-166），出货盘按构造必零回溯。`);
   log(`    有信息量的是分母里那 ${shippedRecs.length - solvedShipped} 张差值（出货但铅笔没推到底）：${solvedShipped === shippedRecs.length ? '0 张，与构造一致' : `${solvedShipped}/${shippedRecs.length}，` + upSeeds.join(' ')}`);
   const fullSolvable = rs.filter((r) => r.fullStatus === 'solved').length;
   const fullKnown = rs.filter((r) => r.fullStatus);

@@ -45,8 +45,12 @@ export const BLANK = -1;
 //     派工书里"7×7 ≈ 80ms"是抽到幸运种子的单次调用：这一档的中位数确实只有 0.16~0.26s，
 //     尾巴却有 4.4s 和 40s+ —— 出货路径没法向浏览器承诺"点一下等多久"。
 //   · 6×6 两批 p95 = 206ms / 374ms，两批都在栏内；每张出货代价 95ms / 364ms 也在栏内。
-//     6×6 也有一条 6.3s 的孤例（48 张里 1 张，峰值 15467 个 DP 状态），那是 p95 之外的单点：
-//     浏览器侧要拿 budgetMs 做超时兜底（超时就说"这局算不出来，换一局"），不是砍档的理由。
+//     6×6 也有一条 6.3s 的孤例（48 张里 1 张，峰值 15467 个 DP 状态），那是 p95 之外的单点，不是砍档的理由。
+//     ⚠ 这里原来写着"浏览器侧要拿 budgetMs 做超时兜底（超时就说这局算不出来，换一局）"——**页面上没有
+//     这一手**：全仓只有 TIERS 自己和这条注释提到 budgetMs，没有一个读取方（grep 得到）。而且兜不了底：
+//     makePuzzle 是同步的、中途打不断，页面能做的只有一帧一帧地让、然后抽下一张 seed
+//     （js/main.js:66-76，上限 MAX_DRAWS=24），真撞上慢盘就是整段主线程阻塞。要兜底得先把出题搬进
+//     worker 或做成可中断的，那是一次功能改动，不是改注释改出来的。
 //   · 8×8 的中位数其实只有 1.1s —— 上一轮 census 印的"每张盘中位 37880ms"是把 mean 标成 median
 //     （总墙钟 ÷ 张数），派工书引的是这个误标值。真实分布更糟：p95 92 秒、max 115 秒、24 抽里
 //     2 抽撞了 120s 超时。砍 8×8 的结论不变，但依据必须是 p95 而不是那个"中位 38 秒"。
@@ -61,8 +65,13 @@ export const BLANK = -1;
 // w+1 列的连通标号），h 只是线性的一维。4×8 与 8×4 的成本差一个数量级，矩形没量过就不进表。
 // 要开矩形档 ⇒ 先 `node tools/ceiling.mjs --sizes=4x8,8x4 --n=24`，把数字补进这张表。
 //
-// budgetMs = 本档实测 p95 向上取整（CI 的红线基线，口径同 battleship-cos）；maxMs / perShipMs /
-// cluesMedian / cluesRange / shipRate 全是上面那张表的读数，改引擎行为之后要重跑 ceiling 再改这里。
+// budgetMs = 当年那批 seed 实测 p95 向上取整。**它没有消费者**（页面无超时兜底，见上面 6×6 那条；
+// balance 也只打印"超过本档 budgetMs 的抽卡数"而不判红）——留着只是给重跑 ceiling 的人一个可比对数，
+// 不构成对玩家的等待承诺。maxMs / perShipMs / cluesMedian / cluesRange / shipRate 全是上面那张表的
+// 读数（ceiling 那批 seed）；`npm run balance` 逐条打 ↔ 对照，2026-09-28 的 24 抽×3 档里对不齐的是
+// normal 的 cluesMedian 12↔9 与 p95Ms 113↔278、hard 的 p95Ms 374↔2085 与 maxMs 6330↔3662，easy 全中。
+// 墙钟那条尾巴是双峰的，换一批 seed 就换一个数：要引数字就引 balance 的现跑输出，否则先重跑 ceiling
+// 再改这里（改引擎行为之后同样要重跑）。
 export const TIERS = [
   { key: 'easy', name: '初学', w: 4, h: 4, budgetMs: 50, p95Ms: 49, maxMs: 49, perShipMs: 21, cluesMedian: 7, cluesRange: [5, 11], shipRate: 0.729 },
   { key: 'normal', name: '熟练', w: 5, h: 5, budgetMs: 150, p95Ms: 113, maxMs: 249, perShipMs: 42, cluesMedian: 12, cluesRange: [4, 15], shipRate: 0.938 },
