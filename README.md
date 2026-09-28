@@ -152,4 +152,4 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 
 ## 许可
 
-MIT。
+MIT。见 `LICENSE`。
