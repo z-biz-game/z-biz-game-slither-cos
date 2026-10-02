@@ -134,9 +134,13 @@ export class BoardView {
   }
 
   // 指针的 client 坐标 → 边号（画布外的点返回 -1）。
+  // rect 的宽高与 geo.w/h 之比就是这一帧的 CSS 缩放：浏览器缩放、外层 transform:scale、
+  // 打印预览都会让它不等于 1，只减 left/top 的话点 A 打 B（数回的边只有几像素粗，偏一点就换边）。
   hitEdge(clientX, clientY) {
     const rect = this.canvas.getBoundingClientRect();
-    return this.hitEdgeLocal(clientX - rect.left, clientY - rect.top);
+    const sx = rect.width ? this.geo.w / rect.width : 1;
+    const sy = rect.height ? this.geo.h / rect.height : 1;
+    return this.hitEdgeLocal((clientX - rect.left) * sx, (clientY - rect.top) * sy);
   }
 
   // ---- 取色（门禁断言用，全部走画布本地坐标 × dpr）--------------------------------
