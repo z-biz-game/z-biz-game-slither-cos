@@ -42,5 +42,14 @@ jobs:
       - name: Golden fixtures match the frozen records
         run: node tools/golden-test.mjs
 
+      # 文档数字闸：README/DESIGN 里每一条能由代码重算的数字都用现跑重算一遍。代码是基准，
+      # 文档是被告——数字对不上时改的是文档，不是断言。
+      - name: Doctest every recomputable number in the docs
+        run: node tools/doctest.mjs
+
+      # 破坏试验台账：四把刀各破坏一组断言、各自把闸带红、再逐字节还原。一把没红过的刀不算证人。
+      - name: Sabotage ledger (every knife must turn the gate red)
+        run: node tools/sabotage.mjs
+
       - name: Entry files exist
         run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html

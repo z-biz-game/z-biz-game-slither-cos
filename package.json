@@ -15,7 +15,9 @@
     "ceiling": "node tools/ceiling.mjs",
     "census": "node tools/census.mjs",
     "balance": "node tools/balance.mjs",
-    "golden": "node tools/write-golden.mjs"
+    "golden": "node tools/write-golden.mjs",
+    "doctest": "node tools/doctest.mjs",
+    "sabotage": "node tools/sabotage.mjs"
   },
   "license": "MIT"
 }

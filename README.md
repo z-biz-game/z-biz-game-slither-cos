@@ -44,8 +44,10 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 - 落子：**左键**点一条边的中点画上一段环，再点一下擦掉；**右键**打一个叉，再点一下取消
   （`index.html:58` 那句就是页面上的原文）。本档**没有键盘通道**——`js/main.js` 里没有 `keydown`
   处理，所以本文也不写"按 X 键"这类 shortcuts，测试台同样不测不存在的按键。
-- 撤销 / 全清 / 新的一局是三颗按钮（`index.html:64-66`），侧栏读数（环上的边、断掉的边，
-  `#stat-on` / `#stat-off`）由引擎现算，不是界面自己数格子。
+- 侧栏六个读数（环上的边 / 打了叉 / 还没定 / 环长 / 步数 / 引擎说）全部由引擎现算，不是界面自己数
+  格子，六个 `.stat` 在 `index.html:70-75`；文档点名的 `#stat-on` / `#stat-off` 就是前两颗。页面一共六颗按钮
+  （`id="btn-*"`：再来一局 / 就看不动 / 撤销 / 全清 / 新的一局 / 清空存档），侧栏那三颗在
+  `index.html:64-66`。
 - 同一个 seed 永远画同一张盘：seed 串形如 `4x4#1-21aa83dbc239`（`js/main.js:55-60` 用
   `crypto.getRandomValues` 的 6 字节加一个自增计数，**不是**按日期算的——"新的一局"那颗按钮不许在
   你说"换一局"的时候其实端回今天那盘）。随机只发生在"选 seed"这一步，生成器内部零随机。
@@ -121,18 +123,21 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 的承诺。聚合命中率这一列另外带了每档"最大单盘独占多少"的披露（`balance` 输出第 [4] 段），本仓有过
 一次聚合数被单个退化样本撑起来的事故，所以只看聚合数的报告一律欠这一列。
 
-## 跑测试：六条命令各自证明什么
+## 跑测试：八条命令各自证明什么
 
 | 命令 | 证明的事 | 本轮读数 |
 |---|---|---|
-| `npm run check` | `js`/`tools` 全部模块 + 3 个根入口语法与 shell 语法，**零依赖**也能有条红线 | 30/30 文件通过，`bash -n` 1/1 |
+| `npm run check` | `js`/`tools` 全部模块 + 3 个根入口语法与 shell 语法，**零依赖**也能有条红线 | 32/32 文件通过，`bash -n` 1/1 |
 | `node tools/loop-test.mjs` | **环的判据本身**：对 ≤4×4 的**全部格子子集**穷举（4×4 是 65536 个子集），拿字面规则、区域判据、两条独立走环实现三方对账 | 1×1…4×4 全绿；顺带钉住两条反例：环里套洞时边界是**两条**环（原简报判"合法"判错了），补集两半各自贴盘边但在盘外连着时是**合法单环**（原简报判"非法"判错了） |
 | `npm test`（counter / pencil / golden / verify 四套） | DP 与朴素枚举比解数；六条规则逐条对真值审计；冻结夹具能被现引擎逐字节重现；判胜器 406 条 | 62 / 40 / 89 / 406 条，失败 0 |
 | `node tools/census.mjs` | 出货率上界那件事逐盘核对（全提示盘可完率），并打印每档 DP 的状态与墙钟分布 | 75.0% / 92.3% / 100.0%（本轮修掉一处 `p.loop.fullSteps`：真字段在顶层，旧写法静默把 `undefined` 混进中位数分母） |
 | `SAMPLES=24 npm run balance` | 上面那四道闸：唯一解证没证完、零猜测、档位有没有选择性、聚合数有没有被单样本撑起 | `RESULT ok=true` |
 | `npm run verify`（`bash tools/verify.sh`） | **浏览器里**的东西：DOM 读数与引擎 `status()` 同数、画布像素真是那个颜色、恢复读的是存档而不是当前内存、赢只由 `verify` 说了算 | 6 个场景 **31 条断言 / 0 失败**（boot 7、render 5、play 7、sizes 5、resume-set 2、resume-check 5），`pages-prefix` 腿在"只放一个符号链接的根"下加载（canvas 436×436、CSS 与引擎都 OK），`fixture-mutation` 腿先红后绿 |
 
-`verify.sh` 的变异腿值得单独说一句，因为它证明的是"这条闸真的在吃磁盘上那批字节"：把夹具里 g4a 的
+| `node tools/doctest.mjs`（`npm run doctest`） | **文档数字闸**：README/DESIGN 里每一条能由代码重算的数字（档位、题数、边数、断言条数、端口、权重、AUC、出货分母……）都用现跑重算一遍——代码是基准，文档是被告，对不上时改的是文档，**绝不把断言改松让它绿** | 13 组逐条对账；本闸自己的组数/条数也钉死（删一条断言就红，并点名是哪一组） |
+| `node tools/sabotage.mjs`（`npm run sabotage`） | **破坏试验台账**：四把刀各破坏一组断言（引擎常量、求解器权重、页面 DOM、门禁端口），每把都必须把闸带红并点名它杀的那条 FAIL，然后逐字节还原；开工前要求工作树干净 | 四把刀四组红 + 控制整跑绿；台账的 rc 是它自己实测盖回源码的自钉 |
+
+`verify.sh`，因为它证明的是"这条闸真的在吃磁盘上那批字节"：把夹具里 g4a 的
 一条边换成同盘面上的另一条合法边，`play` 场景必须当场红——本轮红在该格子的数字对不上（第 3 行第 4
 列写着 2，画了 1 条），还原之后 7 条重新全绿。**一条从没红过的绿不算证人**；这条腿的代价是它会改
 磁盘上的夹具，所以只在本地跑（`SKIP_MUTATION=1` 跳过），并且脚本里先备份、再在 `cleanup` 里还原。
@@ -145,8 +150,9 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 - 本地起服务 `node server.cjs 5277`；桌面壳 `npm run electron`。
 - CI：`.github/workflows/ci.yml`（跑 node 侧与 `check`）+ `pages.yml`（构建 Pages，**故意不部署
   `tools/`**——冻结的答案边集不该从线上页面够得到）。
-- 门禁端口对本仓独占一对：**HTTP 5277 / CDP 9377**（写在 `package.json` 的 description 里，也只在
-  `verify.sh` 与 `playtest.cjs` 各出现一次）。
+- 门禁端口对本仓独占一对：**HTTP 5277 / CDP 9377**。`9377` 现在命中 4 个文件——`tools/verify.sh` 与
+  `tools/playtest.cjs` 的默认值各一处，`server.cjs` 的注释、`package.json` 的 description 各一处；
+  本文档与 `tools/doctest.mjs` 里也写着这个号，那是"说到"不是"用到"，所以 doctest 数的是前四个。
 - 目录：`js/engine/`（`grid` / `loop` / `counter` / `pencil` / `verify` / `generate`）、`js/ui/game.js`、
   `js/store.js`、`js/main.js`，测试与量尺工具全在 `tools/`。
 

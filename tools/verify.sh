@@ -71,6 +71,16 @@ case "$SERVED" in *js/main.js*) ;; *) echo "nothing served at $BASE (see /tmp/sl
 echo "$SERVED" | grep -q 数回 || { echo "port $HTTP is serving a different app, not 数回 Slitherlink" >&2; exit 2; }
 echo "$SERVED" | grep -qi slither || { echo "port $HTTP is serving a different app, not 数回 Slitherlink" >&2; exit 2; }
 
+# ── 逻辑段（浏览器循环之前）：文档数字闸 + 破坏试验台账 ────────────────────────────────────────
+# 顺序是有意的：这两道闸只吃 node，一条撒谎的文档不该先花几十秒起 Chrome 再被发现有谎。
+# doctest 重算 README/DESIGN 里每一条"代码能算出来的数字"；sabotage 再把四组断言真的破坏一遍，
+# 证明那些绿是磁盘上的字节给的，不是抄来的。两者的 rc 都折进 FAILED（见下面的 FAILED=$LOGIC_FAILED）。
+LOGIC_FAILED=0
+echo "=== doctest（文档数字闸：文档是被告，代码是基准）==="
+( cd "$HERE" && node tools/doctest.mjs ) || LOGIC_FAILED=1
+echo "=== sabotage（破坏试验台账：每把刀都得把闸带红）==="
+( cd "$HERE" && node tools/sabotage.mjs ) || LOGIC_FAILED=1
+
 UDD=$(mktemp -d)
 MUTBAK="$UDD/golden.mjs.orig"
 "$CHROME" --headless=new --remote-debugging-port=$PORT --user-data-dir=$UDD \
@@ -129,7 +139,7 @@ print("  %d checks, %d failed  %s" % (len(d["rows"]), d["fail"], extra if extra 
 sys.exit(1 if d["fail"] else 0)
 '
 
-FAILED=0
+FAILED=$LOGIC_FAILED
 TOTAL=0
 # run 不能被 $( ) 捕获：整个函数体会在子 shell 里跑，那里面的 FAILED=1 / TOTAL=… 出了函数就
 # 蒸发，于是一堆 FAIL 印在屏幕上、脚本照样 exit 0 —— 一个永不红的门禁。人读的东西直接走
