@@ -23,7 +23,13 @@ body { touch-action: manipulation; }
 #app {
   max-width: 1080px;
   margin: 0 auto;
-  padding: var(--space-page) var(--space-page) var(--space-inner);
+  /* 四边各加一枚 safe-area 内插值：viewport-fit=cover 之后 env() 才不是恒 0，
+     刘海机上顶栏那四个 HUD 按钮不然会被状态条吃掉一半。 */
+  padding:
+    calc(var(--space-page) + env(safe-area-inset-top))
+    calc(var(--space-page) + env(safe-area-inset-right))
+    calc(var(--space-page) + env(safe-area-inset-bottom))
+    calc(var(--space-page) + env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   gap: var(--space-card);
@@ -281,3 +287,146 @@ button.link {
 }
 
 .foot code { font-family: var(--font-mono); }
+
+/* ---------- 触摸下限：控件的命中尺寸由这一节保证，不由"看着够大"保证 ---------- */
+
+/* 44px 是 iOS HIG 与 Material 共同的下限，也是数回玩家戴着手套点得中的下限。
+   min-width 与 min-height 同时给：HUD 那几个只有图标的按钮不然会塌成一条。 */
+button,
+select,
+.hud {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gutter);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.hud {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--line);
+  background: var(--surface-lift);
+  color: var(--ink);
+  font: 600 12.5px/1 var(--font-sans);
+}
+
+.hud .hud-glyph { font-size: 15px; line-height: 1; color: var(--accent); }
+.hud[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); }
+.hud .hud-text { letter-spacing: 0.04em; }
+
+/* ---------- 特效层：叠在盘面那张正上方，绝不吃点击 ---------- */
+
+#fx-layer {
+  position: absolute;
+  pointer-events: none;
+  /* 这张 canvas 的 left/top 由 js/main.js 的 layout() 按 #board 的 offsetLeft/Top 写，
+     两张纸原点错开一像素，涟漪就会落在隔壁那条边上。 */
+  z-index: 2;
+}
+
+#pause-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: rgba(7, 10, 20, 0.55);
+  border-radius: var(--radius-card);
+  pointer-events: auto;
+}
+
+.pause-line {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--info);
+  background: var(--surface-lift);
+  color: var(--ink);
+  font: 600 13px/1.5 var(--font-sans);
+}
+
+/* ---------- 玩法说明浮层 ---------- */
+
+#help-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--space-page) + env(safe-area-inset-top)) calc(var(--space-page) + env(safe-area-inset-right))
+    calc(var(--space-page) + env(safe-area-inset-bottom)) calc(var(--space-page) + env(safe-area-inset-left));
+  background: rgba(7, 10, 20, 0.78);
+}
+
+.help-card {
+  max-width: 520px;
+  padding: var(--space-card);
+  border-radius: var(--radius-card);
+  background: var(--surface-lift);
+  border: 1px solid var(--accent);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+  animation: pop var(--dur-base) var(--ease-ease);
+  overflow: auto;
+}
+
+.help-card h3 { margin: 0 0 10px; font-size: 17px; letter-spacing: 0.05em; color: var(--accent); }
+.help-card .rules { margin-bottom: 12px; }
+
+.keys { width: 100%; border-collapse: collapse; font-size: 12.5px; color: var(--ink-dim); }
+.keys th {
+  width: 88px;
+  padding: 5px 8px 5px 0;
+  text-align: left;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.keys td { padding: 5px 0; border-bottom: 1px solid var(--line); }
+
+/* ---------- 点阵底纹：仓里现算的那张可平铺 PNG，给面板与卡片当底 ---------- */
+
+.panel,
+.verify-box {
+  background-image: url('../assets/textures/lattice-512.png');
+  background-repeat: repeat;
+  background-size: 512px 512px;
+  background-blend-mode: soft-light;
+}
+
+.win-card,
+.help-card {
+  background-image: url('../assets/textures/lattice-512.png');
+  background-repeat: repeat;
+  background-size: 512px 512px;
+  background-blend-mode: soft-light;
+}
+
+/* ---------- 减弱动态效果：真分支，不是空块 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .win-card,
+  .help-card {
+    animation: none;
+  }
+
+  button:active { transform: none; }
+  #fx-layer { display: none; } /* 涟漪、环上流动的光与辉光全在这张纸上 */
+}

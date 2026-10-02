@@ -9,8 +9,22 @@
 <meta name="theme-color" content="#070A14" />
 <title>数回 · Slitherlink</title>
 <meta name="description" content="数回 Slitherlink：照着格子里的数字，把一条条边连成恰好一条不自交的闭环——数字是这一格四条边里在环上的条数。判胜只由引擎里那份独立的 verify 说了算。" />
-<!-- Inline icon: without it the browser probes the domain root for /favicon.ico and logs a 404. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2322304F'/%3E%3Cpath d='M8 8h16v16z' fill='none' stroke='%233A4C78' stroke-width='1'/%3E%3Cpath d='M8 8h16M8 24h16' fill='none' stroke='%23FFC85C' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='24' cy='8' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='8' cy='24' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='24' cy='24' r='2' fill='%235A6E9E'/%3E%3C/svg%3E" />
+<!-- 图标是 assets/gen/make_art.py 现算的真位图（12 张，见 icons/）。不写内联 data-SVG：
+     那张小图既装不上桌面也上不了商店，而浏览器仍会去探 /favicon.ico。 -->
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="数回" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="数回 · Slitherlink" />
+<meta property="og:description" content="照着格子里的数字，把边连成恰好一条不自交的闭环。每一局都由引擎验过唯一解。" />
+<meta property="og:image" content="assets/social/og-1280x640.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="assets/social/og-1280x640.png" />
 <link rel="stylesheet" href="css/game.css" />
 </head>
 <body>
@@ -22,6 +36,18 @@
     </div>
     <div class="top-actions">
       <span id="stat-tier" class="chip mono">—</span>
+      <button id="btn-pause" class="hud" type="button" aria-pressed="false" aria-label="暂停这一局的动画与时钟（P 或空格）" title="暂停 / 继续（P）">
+        <span class="hud-glyph" aria-hidden="true">❚❚</span><span class="hud-text">暂停</span>
+      </button>
+      <button id="btn-mute" class="hud" type="button" aria-pressed="false" aria-label="静音开关（M）" title="静音 / 开声（M）">
+        <span class="hud-glyph" aria-hidden="true">♪</span><span class="hud-text">开声</span>
+      </button>
+      <button id="btn-fullscreen" class="hud" type="button" aria-pressed="false" aria-label="全屏（F）" title="全屏（F）">
+        <span class="hud-glyph" aria-hidden="true">⤢</span><span class="hud-text">全屏</span>
+      </button>
+      <button id="btn-help" class="hud" type="button" aria-pressed="false" aria-label="玩法说明（H）" title="玩法说明（H）">
+        <span class="hud-glyph" aria-hidden="true">?</span><span class="hud-text">玩法</span>
+      </button>
     </div>
   </header>
 
@@ -40,6 +66,10 @@
           <canvas id="board" role="img"
             aria-label="数回盘面：左键点一条边把它画到环上，再点一下擦掉；右键点一条边打叉，判定它不在环上"
             aria-describedby="state-line"></canvas>
+          <canvas id="fx-layer" aria-hidden="true"></canvas>
+          <div id="pause-veil" hidden>
+            <p class="pause-line">已暂停 · 按 P 或空格继续（仿真与时钟都不推进）</p>
+          </div>
           <!-- 显式的 hidden 规则：#win-veil 平时是 display:grid，会盖掉 UA 的 [hidden]，
                那等于一块看不见却还在吃点击的 veil。场景量的是它的矩形，不是这个属性。 -->
           <div id="win-veil" hidden>
@@ -63,6 +93,7 @@
         <div class="acts">
           <button id="btn-undo" class="ghost" type="button">撤销</button>
           <button id="btn-clear" class="ghost" type="button">全清</button>
+          <button id="btn-restart" class="ghost" type="button">重开本局</button>
           <button id="btn-new" class="primary" type="button">新的一局</button>
         </div>
 
@@ -72,7 +103,9 @@
           <div class="stat"><span>还没定</span><b id="stat-unknown" class="mono">0</b></div>
           <div class="stat"><span>环长</span><b id="stat-len" class="mono">0</b></div>
           <div class="stat"><span>步数</span><b id="stat-moves" class="mono">0</b></div>
+          <div class="stat"><span>用时</span><b id="stat-clock" class="mono">0.00s</b></div>
           <div class="stat"><span>引擎说</span><b id="stat-verify" class="mono">—</b></div>
+          <div class="stat"><span>动效</span><b id="stat-motion" class="mono">开</b></div>
         </div>
 
         <div class="verify-box">
@@ -103,8 +136,46 @@
     <span>盘面 = <code>makePuzzle()</code> 给的题面（<code>clues</code>，不含答案）+ 引擎的三态边数组 · 判胜 = <code>verify()</code> · 像素与模型的一致性由 <code>tools/verify.sh</code> 在真实 Chrome 里逐条量。</span>
     <button id="btn-reset" class="link" type="button">清空存档</button>
   </footer>
+
+  <!-- 玩法说明：H 或 ? 开关。规则本身在右侧面板里常驻，这块浮层多的是键位与手感。 -->
+  <div id="help-veil" hidden role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="help-card">
+      <h3 id="help-title">玩法说明 · 30 秒</h3>
+      <ol class="rules">
+        <li>格子里的<b>数字</b>说：这一格四条边里<b>恰好</b>有这么多条在环上。空格不构成约束。</li>
+        <li>左键点一条边把它<b>连上</b>，再点一下擦掉；右键点一条边打<b>红叉</b>，判定它不在环上。</li>
+        <li>目标是<b>恰好一条</b>闭合不自交的环：用到的格点度数都是 2。红叉只是笔记，不参与判定。</li>
+      </ol>
+      <table class="keys">
+        <caption class="sr-only">键位</caption>
+        <tbody>
+          <tr><th>Enter</th><td>换一张新题面（新的一局）</td></tr>
+          <tr><th>P / 空格</th><td>暂停 / 继续：仿真与时钟都停下，画面不丢状态</td></tr>
+          <tr><th>R</th><td>重开本局：同一张题面清掉笔迹，用时与动效一并复位</td></tr>
+          <tr><th>M</th><td>静音 / 开声：真挂起 AudioContext，静音时不再新建振荡器</td></tr>
+          <tr><th>F</th><td>全屏</td></tr>
+          <tr><th>H / ?</th><td>开合这一页</td></tr>
+        </tbody>
+      </table>
+      <p class="rules-note">系统开了「减弱动态效果」时，涟漪、环上流动的光与胜利辉光全部关闭，标题动效退化成静图；面板上的读数照常更新。</p>
+      <div class="win-actions">
+        <button id="btn-help-close" class="primary" type="button">开始连环</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="js/main.js"></script>
+<script>
+// 可安装性：sw.js 走「网络优先、失败退缓存」，出新 HTML 不会配旧 JS。
+// file:// 下没有 serviceWorker 这个 API（而且注册会抛），整段跳过——那不是玩家的错。
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', function () {
+    // 相对路径：GitHub Pages 的前缀形状（/z-biz-game-slither-cos/）下绝对路径会 404。
+    // scope 不传：默认就是 sw.js 所在目录，而 baseURI 可能带着 #expect= 片段（不是合法 scope）。
+    navigator.serviceWorker.register(new URL('sw.js', document.baseURI || './').href).catch(function () {});
+  });
+}
+</script>
 </body>
 </html>
