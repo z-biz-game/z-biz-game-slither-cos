@@ -94,6 +94,21 @@ function startWith(face) {
   return game;
 }
 
+// 重开：同一道题从头再来 —— 只清玩家的落子、撤销栈、步数和临时状态，**不换题**。
+// 与 newGame 的区别就在这里：newGame 去引擎重抽一道新题，那是「再来一局」；这里是「这题我搞砸了，重来」。
+function restart() {
+  if (!game) return null;
+  game.resetAll();          // val / undoStack / moves 一次归零
+  wonAt = -1;               // 计时停表
+  veilDismissed = false;    // 遮罩回到未看过
+  state.state = 'ready';
+  stateLine.textContent = '已重开 —— 同一道题，注记、撤销栈和步数都归零。';
+  layout();
+  render();
+  persist();                // 落盘也一并回到开局态，刷新页面不会又冒出半局的注记
+  return game;
+}
+
 async function newGame(sizeKey) {
   const size = TIERS.find((t) => t.key === sizeKey) || TIERS[0];
   busy = true;
@@ -245,6 +260,7 @@ canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
 
 $('btn-new').addEventListener('click', () => newGame(currentSize().key));
 $('btn-again').addEventListener('click', () => newGame(currentSize().key));
+$('btn-restart').addEventListener('click', () => restart());
 $('btn-close-veil').addEventListener('click', () => {
   veil.hidden = true;
   veilDismissed = true;
@@ -315,6 +331,7 @@ window.slither = {
     return busy;
   },
   newGame,
+  restart,
   playSeed,
   resumeLast,
   currentSize,
@@ -393,12 +410,18 @@ state.state = 'boot';
 
   btn.addEventListener('click', toggle);
   window.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'f' && ev.key !== 'F') return;
+    const k = ev.key;
+    if (k !== 'f' && k !== 'F' && k !== 'r' && k !== 'R') return;
     const t = ev.target;
-    // 盘号 / 种子这类输入框里打字不能触发全屏，否则玩家输 seed 输到一半屏幕没了。
+    // 盘号 / 种子这类输入框里打字不能触发全屏或重开，否则玩家输 seed 输到一半屏幕没了。
     if (t && /input|textarea|select/i.test(t.tagName || '')) return;
     if (ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     ev.preventDefault();
+    if (k === 'r' || k === 'R') {
+      // 重开要能在**开局进行中**按，不只是结算后 —— 局中按 R 就地重来。
+      if (!busy) restart();
+      return;
+    }
     toggle();
   });
   window.addEventListener('fullscreenchange', sync);
