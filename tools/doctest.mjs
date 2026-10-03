@@ -401,8 +401,8 @@ if (inc('D10')) {
     ['js/engine/loop.js', LOOP_SRC, 'regionReport', /export function regionReport/, 96],
     ['js/engine/loop.js', LOOP_SRC, 'growRegion', /function growRegion/, 151],
     ['js/engine/loop.js', LOOP_SRC, 'generateLoop', /export function generateLoop/, 240],
-    ['index.html', HTML, 'canvas#board', /<canvas id="board"/, 40],
-    ['index.html', HTML, '右键那句', /右键：打个叉/, 58],
+    ['index.html', HTML, 'canvas#board', /<canvas id="board"/, 45],
+    ['index.html', HTML, '右键那句', /右键：打个叉/, 63],
   ];
   for (const [file, src, what, re, want] of ANCHORS) {
     const real = lineOf(src, re);
@@ -429,6 +429,27 @@ if (inc('D10')) {
   const sqLine = lineOf(GEN_SRC, /为什么表里只有正方形/);
   ok(sq.length >= 1 && sq.every((m) => +m[1] <= sqLine && sqLine <= +m[2]), `D10d 文档那句「generate.js:NN-MM 那段（为什么表里只有正方形）」真的落在第 ${sqLine} 行上`,
     `文档 ${sq.map((m) => `${m[1]}-${m[2]}`).join(' / ') || '解析不到'} vs 代码 ${sqLine}`);
+  // D10e/D10f：范围引用（NN-MM）自己也得咬合。D10b 只判「越不越界」，插五行之后 71-76 仍在 118 行里，
+  // 但它罩住的已经不是那六个读数列——PWA 那一笔把 canvas#board 从 40 顶到 45 时，红只有两条点名，
+  // 这两处是没人看的沉默谎言。所以按现算的锚点行首尾对账，而不是只看边界。
+  const statLines = HTML.split('\n').map((l, i) => (/<div class="stat"><span>/.test(l) ? i + 1 : 0)).filter(Boolean);
+  const statRange = (README.match(/\.stat` 在 `index\.html:(\d+)-(\d+)`/) || []);
+  ok(statLines.length === 6 && statRange.length === 3,
+    `D10e 文档那句「六个 .stat 在 index.html:NN-MM」解析到了、且页面现算确实有 6 个 stat 单元（解析不到就是这里红）`,
+    `代码 ${statLines.length} 个 · 文档 ${statRange[1] || '?'}-${statRange[2] || '?'}`);
+  ok(statLines.length === 6 && statRange.length === 3 && +statRange[1] === statLines[0] && +statRange[2] === statLines[statLines.length - 1],
+    `D10e2 那六个 .stat 现在坐在第 ${statLines[0]}-${statLines[statLines.length - 1]} 行，文档引用的范围必须就是这一头一尾`,
+    `代码 ${statLines.join(',')} vs 文档 ${statRange[1]}-${statRange[2]}`);
+  const sideBtns = ['btn-undo', 'btn-clear', 'btn-restart']
+    .map((id) => lineOf(HTML, new RegExp(`<button id="${id}"`)));
+  const sideRange = (README.match(/侧栏那三颗（[^）]*）在 `index\.html:(\d+)-(\d+)`/) || []);
+  ok(sideBtns.every((n) => n > 0) && sideRange.length === 3,
+    `D10f 文档那句「侧栏那三颗在 index.html:NN-MM」解析到了、且那三颗按钮在页面里都找得到（缺一颗就是这里红）`,
+    `撤销/全清/重开 = ${sideBtns.join('/')} · 文档 ${sideRange[1] || '?'}-${sideRange[2] || '?'}`);
+  ok(sideBtns.every((n) => n > 0) && sideRange.length === 3
+     && +sideRange[1] <= Math.min(...sideBtns) && Math.max(...sideBtns) <= +sideRange[2],
+    `D10f2 侧栏那三颗现在在第 ${Math.min(...sideBtns)}-${Math.max(...sideBtns)} 行，文档的范围必须罩得住它们`,
+    `代码 ${sideBtns.join(',')} vs 文档 ${sideRange[1]}-${sideRange[2]}`);
 } else skip('D10', '符号锚点组');
 
 // ── D11 接线：两道文档闸进了 verify.sh 的逻辑段、ci.yml 的 check job、package.json 的 scripts ──
@@ -476,8 +497,8 @@ if (inc('D12')) {
 
 // ── D13 自钉：本闸的组数、每组项数、总项数都钉死；窄化（删断言）在这里红，并点名那一组 ────────
 const EXPECT_GROUPS = 13;
-const EXPECT_ROWS = 181;
-const EXPECT_ROWS_BY_GROUP = { D1: 15, D2: 11, D3: 7, D4: 4, D5: 12, D6: 37, D7: 13, D8: 12, D9: 6, D10: 29, D11: 8, D12: 11 };
+const EXPECT_ROWS = 185;
+const EXPECT_ROWS_BY_GROUP = { D1: 15, D2: 11, D3: 7, D4: 4, D5: 12, D6: 37, D7: 13, D8: 12, D9: 6, D10: 33, D11: 8, D12: 11 };
 const included = [...rowsByGroup.keys()];
 const pinnedFor = included.reduce((a, g) => a + (EXPECT_ROWS_BY_GROUP[g] || 0), 0);
 const before = rows;
