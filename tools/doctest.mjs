@@ -305,7 +305,7 @@ if (inc('D7')) {
     'D7g census 那条 bug 的说法与代码一致：真字段是顶层 fullSteps（generate.js 的返回里确有它）', `返回含 fullSteps=${/fullSteps: full\.steps/.test(GEN_SRC)}`);
 } else skip('D7', 'census 现跑组');
 
-// ── D8 页面读数与默认值：stat 单元、MAX_DRAWS、seed 串、存档键、无键盘通道 ────────────────────
+// ── D8 页面读数与默认值：stat 单元、MAX_DRAWS、seed 串、存档键、键盘通道与按钮 ──────────────
 if (inc('D8')) {
   const stats = [...HTML.matchAll(/<div class="stat"><span>([^<]+)<\/span>/g)].map((m) => m[1]);
   ok(stats.length === 6 && /侧栏六个读数/.test(README), `D8a index.html 现算 ${stats.length} 个 stat 读数单元 == README 那句「侧栏六个读数」`, stats.join('/'));
@@ -323,12 +323,33 @@ if (inc('D8')) {
   const docKey = [...DOCS.matchAll(/`([a-z]+\.save\.v\d+)`/g)].map((m) => m[1]);
   ok(!!keyM && docKey.includes(keyM) && lineOf(STORE_SRC, /const KEY = /) === 10 && /js\/store\.js:10/.test(README),
     `D8h 存档键 ${keyM} 由 store.js 现读，文档抄的是同一个串且引用 :10`, `代码 ${keyM} @store.js:10 · 文档 ${docKey.join('/')}`);
-  ok(!/keydown|keyup|keypress/.test(MAIN_SRC) && !/keydown|keyup|keypress/.test(GAME_SRC) && /没有键盘通道/.test(README),
-    'D8i 「本档没有键盘通道」有代码背书：main.js 与 game.js 里都没有键盘事件', `main=${/keydown/.test(MAIN_SRC)} game=${/keydown/.test(GAME_SRC)}`);
+  // 键盘通道：把"文档写的键集合 == 代码 ev.key 比对的键集合"钉成对应等式。
+  // 不锁"没有键盘"（那会放过"加了键却没写文档"），也不锁死成 F/R 两个字面（那会让代码与文档一起改就永远绿）。
+  const kbSent = (README.match(/键盘通道 (\d) 颗键：([^\n]+)/) || [])[0] || '';
+  const docKeys = [...new Set([...kbSent.matchAll(/`([A-Za-z])`/g)].map((m) => m[1].toLowerCase()))].sort();
+  const kbGuard = (MAIN_SRC.match(/const k = ev\.key;\s*\n\s*if \(k !==[^\n]*\n/) || [])[0] || '';
+  const codeKeys = [...new Set([...kbGuard.matchAll(/'(.)'/g)].map((m) => m[1].toLowerCase()))].sort();
+  const kbCount = kbSent ? +/键盘通道 (\d) 颗键/.exec(kbSent)[1] : -1;
+  ok(docKeys.length >= 1 && codeKeys.length >= 1 && kbCount === codeKeys.length &&
+     docKeys.join(',') === codeKeys.join(',') && !/没有键盘通道/.test(README) &&
+     !/keydown|keyup|keypress/.test(GAME_SRC),
+     `D8i 文档那句「键盘通道 ${kbCount} 颗键」逐颗等于 main.js 的 keydown 比对键（引擎侧 js/ui/game.js 一颗都没有）`,
+     `文档 ${docKeys.join('/')} vs 代码 ${codeKeys.join('/')} · 引擎侧 keydown=${/keydown/.test(GAME_SRC)}`);
+  ok(/\/input\|textarea\|select\/i\.test\(t\.tagName/.test(MAIN_SRC) &&
+     /if \(ev\.repeat \|\| ev\.metaKey \|\| ev\.ctrlKey \|\| ev\.altKey\) return;/.test(MAIN_SRC) &&
+     /`input`\/`textarea`\/`select`/.test(README) && /`repeat`\/`meta`\/`ctrl`\/`alt`/.test(README),
+     'D8i2 键盘的两处护栏（输入框里不触发、repeat 与修饰键一律忽略）代码里写着、文档也逐条点了名',
+     `代码 tagName 护栏=${/tagName/.test(MAIN_SRC)} 修饰键护栏=${/ev\.repeat/.test(MAIN_SRC)}`);
+  ok(/if \(!busy\) restart\(\);/.test(MAIN_SRC) && /开局进行中（`busy`）按 `R` 无效/.test(README),
+     'D8i3 文档那句「开局进行中（busy）按 R 无效」== 代码里 restart 只在 !busy 时走',
+     `代码 ${/if \(!busy\) restart\(\);/.test(MAIN_SRC)} · 文档 ${/开局进行中（`busy`）按 `R` 无效/.test(README)}`);
   const btns = [...HTML.matchAll(/<button\b/g)].length;
   const named = [...HTML.matchAll(/<button id="btn-[\w-]+"[^>]*>([^<]+)<\/button>/g)].map((m) => m[1]);
-  ok(/六颗按钮/.test(README) && btns === 6 && named.length === btns,
-    `D8j README 那句「六颗按钮」== index.html 现在的 ${btns} 颗 <button>（逐颗都读得到名字：${named.length}）`, `页面 ${btns} 颗 · 读到名字 ${named.length} 个：${named.join('/')}`);
+  const btnM = README.match(/页面一共 (\d+) 颗按钮\s*（[^：]*：([^）]*)）/);
+  const docBtns = btnM ? btnM[2].split(' / ') : [];
+  ok(!!btnM && +btnM[1] === btns && named.length === btns && docBtns.join('/') === named.join('/'),
+     `D8j 文档那句「页面一共 ${btnM ? btnM[1] : '解析不到'} 颗按钮」逐颗等于 index.html 现在的 ${btns} 颗 <button>（顺序与名字都算）`,
+     `文档 ${docBtns.join('/')} vs 页面 ${named.join('/')}`);
 } else skip('D8', '页面读数与默认值组');
 
 // ── D9 端口：verify.sh / playtest.cjs / server.cjs / package.json 的默认号必须同数 ─────────────
@@ -455,8 +476,8 @@ if (inc('D12')) {
 
 // ── D13 自钉：本闸的组数、每组项数、总项数都钉死；窄化（删断言）在这里红，并点名那一组 ────────
 const EXPECT_GROUPS = 13;
-const EXPECT_ROWS = 179;
-const EXPECT_ROWS_BY_GROUP = { D1: 15, D2: 11, D3: 7, D4: 4, D5: 12, D6: 37, D7: 13, D8: 10, D9: 6, D10: 29, D11: 8, D12: 11 };
+const EXPECT_ROWS = 181;
+const EXPECT_ROWS_BY_GROUP = { D1: 15, D2: 11, D3: 7, D4: 4, D5: 12, D6: 37, D7: 13, D8: 12, D9: 6, D10: 29, D11: 8, D12: 11 };
 const included = [...rowsByGroup.keys()];
 const pinnedFor = included.reduce((a, g) => a + (EXPECT_ROWS_BY_GROUP[g] || 0), 0);
 const before = rows;
