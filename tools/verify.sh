@@ -73,7 +73,7 @@ echo "$SERVED" | grep -qi slither || { echo "port $HTTP is serving a different a
 
 # ── 逻辑段（浏览器循环之前）：文档数字闸 + 破坏试验台账 ────────────────────────────────────────
 # 顺序是有意的：这两道闸只吃 node，一条撒谎的文档不该先花几十秒起 Chrome 再被发现有谎。
-# doctest 重算 README/DESIGN 里每一条"代码能算出来的数字"；sabotage 再把四组断言真的破坏一遍，
+# doctest 重算 README/DESIGN 里每一条"代码能算出来的数字"；sabotage 再把十三组的每一组真的破坏一遍，
 # 证明那些绿是磁盘上的字节给的，不是抄来的。两者的 rc 都折进 FAILED（见下面的 FAILED=$LOGIC_FAILED）。
 LOGIC_FAILED=0
 echo "=== doctest（文档数字闸：文档是被告，代码是基准）==="

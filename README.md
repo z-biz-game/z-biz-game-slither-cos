@@ -135,7 +135,7 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 | `npm run verify`（`bash tools/verify.sh`） | **浏览器里**的东西：DOM 读数与引擎 `status()` 同数、画布像素真是那个颜色、恢复读的是存档而不是当前内存、赢只由 `verify` 说了算 | 6 个场景 **31 条断言 / 0 失败**（boot 7、render 5、play 7、sizes 5、resume-set 2、resume-check 5），`pages-prefix` 腿在"只放一个符号链接的根"下加载（canvas 436×436、CSS 与引擎都 OK），`fixture-mutation` 腿先红后绿 |
 
 | `node tools/doctest.mjs`（`npm run doctest`） | **文档数字闸**：README/DESIGN 里每一条能由代码重算的数字（档位、题数、边数、断言条数、端口、权重、AUC、出货分母……）都用现跑重算一遍——代码是基准，文档是被告，对不上时改的是文档，**绝不把断言改松让它绿** | 13 组逐条对账；本闸自己的组数/条数也钉死（删一条断言就红，并点名是哪一组） |
-| `node tools/sabotage.mjs`（`npm run sabotage`） | **破坏试验台账**：四把刀各破坏一组断言（引擎常量、求解器权重、页面 DOM、门禁端口），每把都必须把闸带红并点名它杀的那条 FAIL，然后逐字节还原；开工前要求工作树干净 | 四把刀四组红 + 控制整跑绿；台账的 rc 是它自己实测盖回源码的自钉 |
+| `node tools/sabotage.mjs`（`npm run sabotage`） | **破坏试验台账**：十三把刀，doctest 的十三个组一组一把——引擎常量、求解器权重、边号次序注释、判据数组、夹具自测、balance 报表、census 报表、页面 DOM、门禁端口、符号锚点行号、npm 接线、UNPINNED needle、本闸的项数钉表；每把都必须把闸带红并点名它杀的那条 FAIL，然后逐字节还原；开工前要求工作树干净 | 十三把刀十三组红 + 干净树控制整跑绿；台账的 rc 是它自己实测盖回源码的自钉 |
 
 `verify.sh`，因为它证明的是"这条闸真的在吃磁盘上那批字节"：把夹具里 g4a 的
 一条边换成同盘面上的另一条合法边，`play` 场景必须当场红——本轮红在该格子的数字对不上（第 3 行第 4

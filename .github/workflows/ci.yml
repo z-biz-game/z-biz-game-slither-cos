@@ -47,7 +47,7 @@ jobs:
       - name: Doctest every recomputable number in the docs
         run: node tools/doctest.mjs
 
-      # 破坏试验台账：四把刀各破坏一组断言、各自把闸带红、再逐字节还原。一把没红过的刀不算证人。
+      # 破坏试验台账：十三把刀一组一把各破坏一组断言、各自把闸带红、再逐字节还原。一把没红过的刀不算证人。
       - name: Sabotage ledger (every knife must turn the gate red)
         run: node tools/sabotage.mjs
 

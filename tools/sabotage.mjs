@@ -2,7 +2,7 @@
 // 破坏试验台账（sabotage ledger）——六条门里的"这条闸真的在吃磁盘上那批字节"那一条。
 //
 // 规矩（和 doctest 一样硬）：
-//   1. 每一把刀破坏的是**不同一组**断言（group 列），四把刀不许挤在同一组里充数。
+//   1. 每一把刀破坏的是**不同一组**断言（group 列），十三把刀不许挤在同一组里充数。
 //   2. 每一把刀都必须把闸带红（rc≠0），而且日志里必须出现**它杀掉的那条 FAIL 原文**——
 //      assert 匹配的是打出来的那一行，不是转述；匹配不到就记 '(日志里没有点名的那条 FAIL)'，
 //      本脚本随之判红。一把从没红过的刀不算证人。
@@ -12,8 +12,9 @@
 //      引用的那一处"这个前提不成立，别的写者正在改同一个文件时必须先停下来。
 //   5. 台账把自己**实测**到的 rc 盖回自己源码的 rc: 字段（自钉）。第二次跑输出必须与第一次
 //      逐字相同——这就是 idempotent stamping 的证明。
-//   6. 刀口跑用显式子集（不含 D5：counter-test / pencil-test 是分钟级，而且它们不是被破坏的
-//      对象）。子集会打印 NOTE 说明哪一组没参与，绝不静默跳过；收尾的控制跑是**整跑**。
+//   6. 刀口跑默认用显式子集（不含 D5：counter-test / pencil-test 是分钟级，而且它们不是被破坏的
+//      对象），子集会打印 NOTE 说明哪一组没参与，绝不静默跳过。K7 打的正是 D5，它自带 subset。
+//      收尾的控制跑是**整跑**。
 'use strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -44,9 +45,12 @@ if (dirty.length) {
 const SUBSET = 'D1,D2,D3,D4,D6,D7,D8,D9,D10,D11,D12';
 
 /**
- * 四把刀，四组断言：
- *  K1 引擎常量（D1 档位/天花板）  K2 求解器权重（D2 六条规则）
- *  K3 页面 DOM（D8 侧栏读数）     K4 门禁配置（D9 端口）
+ * 十三把刀，doctest 的十三个组一组一把（D1–D13）：
+ *  K1 引擎常量（D1 档位/天花板）   K2 求解器权重（D2 六条规则）    K3 页面 DOM（D8 侧栏读数）
+ *  K4 门禁端口（D9）              K5 邻接次序注释（D3 边号契约）  K6 判据数组次序（D4 六个判据）
+ *  K7 夹具自测（D5 四套条数）      K8 balance 报表（D6 难度表现值） K9 census 报表（D7 出货上界）
+ *  K10 插一行注释（D10 符号锚点）  K11 改 npm script 名（D11 接线） K12 改 UNPINNED needle（D12 墙钟类）
+ *  K13 改每组项数钉表（D13 自钉）
  * rc 是**实测盖回来的**自钉：0/1 由不得期望，只由不得说谎。
  */
 const KNIVES = [
@@ -90,6 +94,97 @@ const KNIVES = [
     assert: /^\s*FAIL .*D9c CDP 默认号三处同一个数.*$/m,
     rc: '1',
   },
+  {
+    id: 'K5',
+    group: 'D3',
+    file: 'js/engine/grid.js',
+    from: '  // 格子的四邻（与 cellEdges 同序：上、下、左、右；越界给 -1）',
+    to: '  // 格子的四邻（与 cellEdges 同序：上、下、右、左；越界给 -1）',
+    breaks: '把 grid.js 里那句"四邻与 cellEdges 同序"的次序注释改成 上、下、右、左——数组一个字没动，只有这条注释开始说谎，而 README/DESIGN 的 `[上,下,左,右]` 正是从它取的词',
+    assert: /^\s*FAIL .*D3g cellEdges.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K6',
+    group: 'D4',
+    file: 'js/engine/verify.js',
+    from: "export const CHECK_ORDER = ['empty', 'clues', 'degrees', 'dot4', 'open', 'single'];",
+    to: "export const CHECK_ORDER = ['empty', 'clues', 'dot4', 'degrees', 'open', 'single'];",
+    breaks: '把判据数组里中间两项对调（条数还是 6，"六个判据"那句仍然对）——README 抄的那条字面数组与代码逐元素不再相同，先报哪个错也变了',
+    assert: /^\s*FAIL .*D4b README 抄的 CHECK_ORDER 字面数组.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K7',
+    group: 'D5',
+    file: 'tools/golden-test.mjs',
+    from: 'ok(GOLDEN.length >= 5,',
+    to: 'ok(GOLDEN.length >= 6,',
+    breaks: '把 golden 夹具自测的门槛从"至少 5 条"抬到"至少 6 条"（仓里确实只有 5 份）——那套测试自己红，D5 现场跑读到的就是"失败 1 条"而不是抄来的 0',
+    subset: 'D5',
+    assert: /^\s*FAIL .*D5 golden-test 现跑给出.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K8',
+    group: 'D6',
+    file: 'tools/balance.mjs',
+    from: '其中**已证唯一解** ${proven.length}/${rs.length}',
+    to: '其中**已证唯一解** ${proven.length + 1}/${rs.length}',
+    breaks: '难度实测报表里"已证唯一解"的分子 +1（多报一张已证盘）——README 的抽卡/出货/已证那一列、[G1] 那句「实测 20 / 24 / 24」都与现跑对不上了',
+    assert: /^\s*FAIL .*D6 初学 的「.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K9',
+    group: 'D7',
+    file: 'tools/census.mjs',
+    from: '${pct(fullOK, cand)}（${fullOK}/${cand}）',
+    to: '${pct(fullOK, cand)}（${fullOK}/${cand + 1}）',
+    breaks: '普查报表里全提示盘可完率的分母 +1（文档抄的「xx%（a/b）」那三个百分数当场少一个候选盘）——上界那句不再与 census 现跑同源',
+    assert: /^\s*FAIL .*D7d 文档那句「.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K10',
+    group: 'D10',
+    file: 'js/engine/loop.js',
+    from: '// 一个种子的完整出题：只用 makeRng(seed)\nexport function generateLoop(',
+    to: '// 一个种子的完整出题：只用 makeRng(seed)\n// 台账插入的一行注释：什么都不改，只让下面这个导出的行号比文档引用多 1\nexport function generateLoop(',
+    breaks: '在 generateLoop 头上插一行注释（代码语义一字未变）——文档里那句 `loop.js:240` 就指到了隔壁行上，符号锚点必须为这次漂移发红',
+    assert: /^\s*FAIL .*D10 「js\/engine\/loop\.js」的 generateLoop.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K11',
+    group: 'D11',
+    file: 'package.json',
+    from: '"doctest": "node tools/doctest.mjs",',
+    to: '"doctest-docs": "node tools/doctest.mjs",',
+    breaks: '把 npm script 的名字改掉（JSON 仍然可解析、命令仍然指向同一个文件）——README 承诺的 `npm run doctest` 与 ci.yml 里那条 check 步骤当场断线',
+    assert: /^\s*FAIL .*D11a package\.json 有 doctest 与 sabotage 两条 script.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K12',
+    group: 'D12',
+    file: 'tools/doctest.mjs',
+    from: String.raw`    ['U1', '难度表 engine ms 三列（18.3 / 30.6 / 31.5 等）', /18\.3 \/ 30\.6 \/ 31\.5/],`,
+    to: String.raw`    ['U1', '难度表 engine ms 三列（18.3 / 30.6 / 31.5 等）', /18\.3 \/ 30\.6 \/ 31\.6/],`,
+    breaks: '把 UNPINNED 清单里 U1 那一条的 needle 改一个数字（31.5 → 31.6）——钉不住的读数也要"还写在文档里"，这一改让那道"要求它还在"的断言先红',
+    assert: /^\s*FAIL .*D12 U1「.*$/m,
+    rc: '?',
+  },
+  {
+    id: 'K13',
+    group: 'D13',
+    file: 'tools/doctest.mjs',
+    from: 'D2: 11, D3: 7, D4: 4',
+    to: 'D2: 11, D3: 6, D4: 4',
+    breaks: '把本闸的每组项数钉表里 D3 那一格从 7 改成 6（少钉一条就等于允许那一组静默少发一条）——自钉组必须当场点名是哪一组漂了',
+    assert: /^\s*FAIL .*D13e 子集内 D3 发.*$/m,
+    rc: '?',
+  },
 ];
 
 const runDoctest = (env) => {
@@ -105,7 +200,15 @@ const runDoctest = (env) => {
 const rows = [];
 let veto = 0;
 console.log('=== sabotage：破坏试验台账（每把刀都必须把闸带红，并点名它杀的那条断言）===');
-console.log(`刀口跑的子集 = ${SUBSET}（D5 不参与，doctest 会为它打印 NOTE）；收尾控制跑 = 整跑。\n`);
+console.log(`刀口跑默认子集 = ${SUBSET}（D5 不参与，doctest 会为它打印 NOTE；打 D5 的刀自带 subset）；收尾控制跑 = 整跑。`);
+
+// 规矩 1 由台账自己数：两组同名的刀就是有一把在充数，这里直接判红而不是只在末尾提一句。
+for (const [g, ids] of [...KNIVES.reduce((m, k) => m.set(k.group, [...(m.get(k.group) || []), k.id]), new Map())]
+  .filter(([, ids]) => ids.length > 1)) {
+  console.log(`  FAIL 组 ${g} 有 ${ids.length} 把刀（${ids.join(' ')}）——规矩 1 要求一把刀一组`);
+  veto += 1;
+}
+console.log('');
 
 for (const k of KNIVES) {
   const original = read(k.file);
@@ -126,7 +229,7 @@ for (const k of KNIVES) {
   writeFileSync(p(k.file), sabotagedSrc, 'utf8');
   let gate;
   try {
-    gate = runDoctest({ DOCTEST_GROUPS: SUBSET });
+    gate = runDoctest({ DOCTEST_GROUPS: k.subset || SUBSET });
   } finally {
     writeFileSync(p(k.file), original, 'utf8');
   }
@@ -186,7 +289,7 @@ for (const r of rows) {
   console.log(`| ${r.id} | ${r.group} | ${r.file} | ${r.red} | 非 0 | ${r.named.replace(/\|/g, '\\|')} | ${r.restored} |`);
 }
 const groups = new Set(KNIVES.map((k) => k.group));
-console.log(`\n四把刀覆盖的组：${[...groups].sort().join(' / ')}（${groups.size} 组互不相同）· 否决项 ${veto}`);
+console.log(`\n十三把刀覆盖的组：${[...groups].sort().join(' / ')}（${groups.size} 组互不相同）· 否决项 ${veto}`);
 console.log('rc 列是台账**实测**盖回自己源码的自钉：把它手改成别的数，下一跑就会因为对不上而重写并说明为什么。');
 if (veto !== 0) {
   console.log('\n=== 台账判红：有刀没把闸带红 / 没点名 / 没还原干净 ===');
