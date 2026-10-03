@@ -102,7 +102,7 @@ const KNIVES = [
     to: '  // 格子的四邻（与 cellEdges 同序：上、下、右、左；越界给 -1）',
     breaks: '把 grid.js 里那句"四邻与 cellEdges 同序"的次序注释改成 上、下、右、左——数组一个字没动，只有这条注释开始说谎，而 README/DESIGN 的 `[上,下,左,右]` 正是从它取的词',
     assert: /^\s*FAIL .*D3g cellEdges.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K6',
@@ -112,7 +112,7 @@ const KNIVES = [
     to: "export const CHECK_ORDER = ['empty', 'clues', 'dot4', 'degrees', 'open', 'single'];",
     breaks: '把判据数组里中间两项对调（条数还是 6，"六个判据"那句仍然对）——README 抄的那条字面数组与代码逐元素不再相同，先报哪个错也变了',
     assert: /^\s*FAIL .*D4b README 抄的 CHECK_ORDER 字面数组.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K7',
@@ -123,7 +123,7 @@ const KNIVES = [
     breaks: '把 golden 夹具自测的门槛从"至少 5 条"抬到"至少 6 条"（仓里确实只有 5 份）——那套测试自己红，D5 现场跑读到的就是"失败 1 条"而不是抄来的 0',
     subset: 'D5',
     assert: /^\s*FAIL .*D5 golden-test 现跑给出.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K8',
@@ -133,7 +133,7 @@ const KNIVES = [
     to: '其中**已证唯一解** ${proven.length + 1}/${rs.length}',
     breaks: '难度实测报表里"已证唯一解"的分子 +1（多报一张已证盘）——README 的抽卡/出货/已证那一列、[G1] 那句「实测 20 / 24 / 24」都与现跑对不上了',
     assert: /^\s*FAIL .*D6 初学 的「.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K9',
@@ -143,7 +143,7 @@ const KNIVES = [
     to: '${pct(fullOK, cand)}（${fullOK}/${cand + 1}）',
     breaks: '普查报表里全提示盘可完率的分母 +1（文档抄的「xx%（a/b）」那三个百分数当场少一个候选盘）——上界那句不再与 census 现跑同源',
     assert: /^\s*FAIL .*D7d 文档那句「.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K10',
@@ -153,7 +153,7 @@ const KNIVES = [
     to: '// 一个种子的完整出题：只用 makeRng(seed)\n// 台账插入的一行注释：什么都不改，只让下面这个导出的行号比文档引用多 1\nexport function generateLoop(',
     breaks: '在 generateLoop 头上插一行注释（代码语义一字未变）——文档里那句 `loop.js:240` 就指到了隔壁行上，符号锚点必须为这次漂移发红',
     assert: /^\s*FAIL .*D10 「js\/engine\/loop\.js」的 generateLoop.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K11',
@@ -163,7 +163,7 @@ const KNIVES = [
     to: '"doctest-docs": "node tools/doctest.mjs",',
     breaks: '把 npm script 的名字改掉（JSON 仍然可解析、命令仍然指向同一个文件）——README 承诺的 `npm run doctest` 与 ci.yml 里那条 check 步骤当场断线',
     assert: /^\s*FAIL .*D11a package\.json 有 doctest 与 sabotage 两条 script.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K12',
@@ -173,7 +173,7 @@ const KNIVES = [
     to: String.raw`    ['U1', '难度表 engine ms 三列（18.3 / 30.6 / 31.5 等）', /18\.3 \/ 30\.6 \/ 31\.6/],`,
     breaks: '把 UNPINNED 清单里 U1 那一条的 needle 改一个数字（31.5 → 31.6）——钉不住的读数也要"还写在文档里"，这一改让那道"要求它还在"的断言先红',
     assert: /^\s*FAIL .*D12 U1「.*$/m,
-    rc: '?',
+    rc: '1',
   },
   {
     id: 'K13',
@@ -183,7 +183,7 @@ const KNIVES = [
     to: 'D2: 11, D3: 6, D4: 4',
     breaks: '把本闸的每组项数钉表里 D3 那一格从 7 改成 6（少钉一条就等于允许那一组静默少发一条）——自钉组必须当场点名是哪一组漂了',
     assert: /^\s*FAIL .*D13e 子集内 D3 发.*$/m,
-    rc: '?',
+    rc: '1',
   },
 ];
 
