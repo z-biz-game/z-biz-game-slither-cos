@@ -332,3 +332,51 @@ a[href],
   min-height: 44px !important;
   min-width: 44px !important;
 }
+
+/* 减弱动效（prefers-reduced-motion）—— 真分支，不是空壳
+ *
+ * 本仓是**少数动效真在 CSS 上的仓**（不是 canvas 画出来的），所以这里用媒体查询就够，
+ * 不必往 js 里塞 matchMedia。两处装饰：
+ *   ① .win-card 的 animation: pop（scale 0.9→1 + opacity 0→1，通关卡片弹一下）
+ *   ② button 的 transition: transform（:active 时 translateY(1px) 的按压手感）
+ *
+ * 为什么减这两处、留下别的：pop 与按压位移都是**锦上添花** —— 弹一下不影响"你赢了"这件事
+ * 被看见，按下去的下沉也不影响按钮能被点到；颜色、边框、文案一概不动。
+ * 换句话说：动效去掉，信息一条不少。
+ *
+ * 注：上面那两条声明里的 var(--dur-win) / var(--dur-base) / var(--ease-ease) 在本仓
+ * :root 里并没有定义（只有 safe-area 四个与 --touch-min），所以整条 animation/transition
+ * 声明按 CSS 规范是 invalid 的、浏览器会丢掉。**本段的规则不依赖那三个变量**，写成
+ * animation: none / transition: none 这样的关键字，无论变量将来补不补都成立。
+ * 变量缺失这件事本身是另一笔账，不在本单范围，这里只如实记一句。 */
+@media (prefers-reduced-motion: reduce) {
+  /* 通关卡片：不再从 0.9 缩放、不再淡入，直接以最终样子出现 */
+  .win-card {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  @keyframes pop {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* 按钮按压：不再下沉那 1px，也不再渐变边框色 —— 命中区与配色一律照旧 */
+  button,
+  select,
+  input,
+  textarea,
+  a[href],
+  [role="button"] {
+    transition: none;
+  }
+  button:active { transform: none; }
+
+  /* 兜底：仓内任何将来新增的装饰性动画/过渡都归零（不含 scroll-behavior 之类会改布局的） */
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
