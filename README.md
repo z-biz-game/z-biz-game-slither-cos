@@ -131,7 +131,7 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 
 | 命令 | 证明的事 | 本轮读数 |
 |---|---|---|
-| `npm run check` | `js`/`tools` 全部模块 + 3 个根入口语法与 shell 语法，**零依赖**也能有条红线 | 33/33 文件通过，`bash -n` 1/1 |
+| `npm run check` | `js`/`tools` 全部模块 + 3 个根入口语法与 shell 语法，**零依赖**也能有条红线 | 35/35 文件通过，`bash -n` 1/1 |
 | `node tools/loop-test.mjs` | **环的判据本身**：对 ≤4×4 的**全部格子子集**穷举（4×4 是 65536 个子集），拿字面规则、区域判据、两条独立走环实现三方对账 | 1×1…4×4 全绿；顺带钉住两条反例：环里套洞时边界是**两条**环（原简报判"合法"判错了），补集两半各自贴盘边但在盘外连着时是**合法单环**（原简报判"非法"判错了） |
 | `npm test`（counter / pencil / golden / verify 四套） | DP 与朴素枚举比解数；六条规则逐条对真值审计；冻结夹具能被现引擎逐字节重现；判胜器 406 条 | 62 / 40 / 89 / 406 条，失败 0 |
 | `node tools/census.mjs` | 出货率上界那件事逐盘核对（全提示盘可完率），并打印每档 DP 的状态与墙钟分布 | 75.0% / 92.3% / 100.0%（本轮修掉一处 `p.loop.fullSteps`：真字段在顶层，旧写法静默把 `undefined` 混进中位数分母） |
@@ -163,3 +163,41 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 ## 许可
 
 MIT。见 `LICENSE`。
+
+## 上线的到底是哪一批文件
+
+这个仓没有打包器：站点=一次文件拷贝。以前「拷哪些」写在 `pages.yml` 的 `run:` 里（手抄的几行
+`cp`）。本地 `index.html` 直读仓库根，永远自洽；线上却按那份清单拷，于是页面后来引用的
+`manifest.webmanifest`、`sw.js`、`icons/*` 可能一个都没上去——线上 404，而仓里的引擎测试与
+真浏览器闸全绿，因为它们跑的都是仓库根，没有任何一步在「按清单拷」的那个环境下加载过页面。
+
+现在清单只有一份，住在 `tools/assemble-site.sh`：CI 调它拷 `_site`，本地闸调它拷临时目录，
+然后**对拷出来的产物**提要求（`tools/deploy-set.mjs`）：
+
+- **W 清单与页面同源**：`pages.yml` 里必须真有 `run: bash tools/assemble-site.sh <dir>` 这一行，
+  `ci.yml` 里必须真有 `run: node tools/deploy-set.mjs`。认的是调用那一行，不是文件里出现过这个
+  路径——注释里本来就会写它，只 grep 字符串会被一句散文喂绿。
+- **R 引用可达**：引用不靠手打名单。从 `index.html` 的 `href/src` 出发，凡解析出来是 `.js`/`.css`
+  的就把那一站也扫一遍（CSS 的 `url()`、JS 去掉注释后的 `'./…'` 字面量、`new URL(x, base)` 的两种
+  基、`navigator.serviceWorker.register`、`scope`），`manifest` 的 icons/screenshots/shortcuts 各自
+  的 `src` 也算引用。取径上读不到的那一站本身就是红（读不到＝这一站根本没扫）。每条引用都必须在
+  产物里且非 0 字节；绝对路径单列一条红，因为 Pages 挂在 `/<repo>/` 前缀下会跳出去。
+- **P 位图不许说谎**：`manifest` 声明的 `sizes` 必须等于 PNG IHDR 的真实宽高。
+- **钉住两个数**：R 段实际检查的路径条数（`30`）与这一次跑的断言条数（`48`），两个数
+  都钉在 `tools/deploy-set.mjs` 顶部的那对常量里。没改页面却掉了，说明解析断了；删掉一张图标会同时
+  少一条 R10 与那张的 P1/P2，所以两个数一起钉，断言条数能漂就是闸在缩水的信号。这一节故意只写数值、
+  不写那对常量的名字：本仓原有的文档闸会拿"文档里出现过的同名标识号"回数它自己的条数（skyscraper
+  的 D14b 就是这种钉法），两道闸共用一个名字就互相打红。
+
+`tools/deploy-set-selftest.mjs` 是这两颗钉的阳性证明：它把仓库复制到临时目录，照着每一类断言
+各下一刀（X1 清单不收位图目录 / X2 模块边改名 / X3 CSS 写绝对路径 / X4 `start_url` 绝对 /
+X5 删光 >=512 图标 / X6 少一个必填字段 / X7 声明尺寸与真图不符 / X8 workflow 不调脚本 /
+X9 CI 不跑闸 / X10 是阴性对照——往入口 JS 追加一行只写在注释里的假路径，闸必须仍然绿、条数仍然
+`30`、断言仍然 `48`；X11 og:image 退回相对路径 / X12 og:image 的前缀指向别的 slug），
+要求每一刀都让闸**点名**变红。靶子从 `DEPLOY_SET_DUMP=1`
+的出处表现挑（取径真的会读的那支 JS / 那一张 CSS，不写死某一个仓的入口名），所以页面改了、仓与仓
+不同，台架跟着走。
+
+`node tools/deploy-set.mjs` 与 `node tools/deploy-set-selftest.mjs` 就是 CI 跑的那两条命令本身
+（package.json 里的 `deploy-set` / `deploy-set:selftest` 只是同一支脚本的 npm 入口）；把它们接进本仓
+那条浏览器 one-shot（`tools/verify.sh`）还欠着——那道脚本的腿名单与条数钉是每个仓自己的形状。
