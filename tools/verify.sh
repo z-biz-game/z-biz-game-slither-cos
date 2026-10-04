@@ -115,7 +115,7 @@ curl -fsS -m 2 "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1 || {
 export CDP_PORT=$PORT
 export BASE_URL=$BASE
 cd "$HERE"
-node tools/playtest.cjs open "$BASE" | head -5 || { echo "playtest 连不上 $BASE（见 /tmp/slither-chrome.log）" >&2; exit 3; }
+node tools/playtest.cjs open "$BASE" | head -5 || { echo "playtest 连不上 ${BASE}（见 /tmp/slither-chrome.log）" >&2; exit 3; }
 
 # RESULT <json> 是场景输出的最后一行，这里把它拆成人能读的一行行 + 退出码。
 # 场景日志的名字走环境 SCEN_LOG：在单引号的 python 串里写 "$SCEN" 的话，展开发生在**定义**
@@ -270,7 +270,7 @@ if [ "$LOCAL" = 1 ]; then
     sleep 0.25
   done
   PRESERVED=$(curl -fsS -m 3 "$PRE" 2>/dev/null || true)
-  case "$PRESERVED" in *js/main.js*) ;; *) echo "  FAIL 前缀形状下拿不到本仓 index.html：$PRE（见 /tmp/slither-prefix-server.log）" >&2; FAILED=1 ;; esac
+  case "$PRESERVED" in *js/main.js*) ;; *) echo "  FAIL 前缀形状下拿不到本仓 index.html：${PRE}（见 /tmp/slither-prefix-server.log）" >&2; FAILED=1 ;; esac
   if [ -n "$PRESERVED" ]; then
     # open 而不是 eval：eval 默认会把 tab 导航回 BASE（根路径），那这一段就又在测一次根、
     # 前缀从来没被访问过——一个永远不会红的门禁。open 会先关掉本 origin 的旧 tab。
@@ -300,6 +300,6 @@ if [ "$LOCAL" = 1 ]; then
 fi
 
 kill $WD 2>/dev/null
-echo "=== 断言总数：$TOTAL（只印不判：条数是被测对象的性质，不是门禁的承诺） ==="
+echo "=== 断言总数：${TOTAL}（只印不判：条数是被测对象的性质，不是门禁的承诺） ==="
 [ $FAILED -eq 0 ] && echo "=== ALL GREEN ===" || echo "=== FAILURES ABOVE ==="
 exit $FAILED
