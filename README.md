@@ -154,6 +154,12 @@ Node v26.8.1 / macOS 25.6.0 / Apple M5 Pro 15 核。断言条数与 `npm run che
 - 本地起服务 `node server.cjs 5277`；桌面壳 `npm run electron`。
 - CI：`.github/workflows/ci.yml`（跑 node 侧与 `check`）+ `pages.yml`（构建 Pages，**故意不部署
   `tools/`**——冻结的答案边集不该从线上页面够得到）。
+- `npm run verify`（`bash tools/verify.sh`，真浏览器闸）是**本地限定**的一条门，写清楚免得把它当 CI 的门：
+  `ci.yml` 与 `pages.yml` 都不叫它，`tools/check.mjs` 只对它做 `bash -n`（语法检查），从不执行它——CI 里
+  没有浏览器 job。本机实测整闸一趟 rc=0、墙钟 1266.5 s（大头是破坏试验台账那十三把刀各重跑一遍 doctest），
+  而且它带 `fixture-mutation` 那条会临时改磁盘上冻结夹具的腿。以十分钟计的代价加上"会动磁盘"这个形状，
+  都不适合挂在每个 push 上；要跑就在 push 之前本地跑这一条。`SKIP_MUTATION=1` 与 `SCENARIOS="…"` 是调试
+  通道——它们各自把这条门要证的东西摘掉一块，别把收窄后的绿当整闸的绿。
 - 门禁端口对本仓独占一对：**HTTP 5277 / CDP 9377**。`9377` 现在命中 4 个文件——`tools/verify.sh` 与
   `tools/playtest.cjs` 的默认值各一处，`server.cjs` 的注释、`package.json` 的 description 各一处；
   本文档与 `tools/doctest.mjs` 里也写着这个号，那是"说到"不是"用到"，所以 doctest 数的是前四个。
