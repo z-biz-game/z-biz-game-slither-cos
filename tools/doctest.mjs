@@ -409,7 +409,7 @@ if (inc('D10')) {
     ok(real > 0 && real === want, `D10 「${file}」的 ${what} 现在在第 ${real} 行（文档引用 :${want}）`, real < 0 ? '代码里解析不到这个符号' : `代码 ${real} vs 文档 ${want}`);
   }
   const resolveCite = (p) => { if (existsSync(join(ROOT, p))) return p; const b = p.split('/').pop(); for (const d of ['js/engine/', 'js/', 'js/ui/', 'tools/', 'css/', '']) if (existsSync(join(ROOT, d + b))) return d + b; return null; };
-  const cites = [...DOCS.matchAll(/((?:\.github\/workflows\/|js\/|tools\/|css\/)?[\w./-]+\.(?:js|mjs|cjs|sh|json|html|yml)):(\d+)(?:-(\d+))?/g)];
+  const cites = [...DOCS.matchAll(/((?:\.github\/workflows\/|js\/|tools\/|css\/)?[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,11}):(\d+)(?:-(\d+))?/g)];
   // 一条引用能犯的错有三样：文件不在树里、行号越界、被指的行段整段是空行。第三样是这一轮补的：
   // 在中间插几行之后 `:NN` 指的是空行，可它还在界内，只问「行号存在吗」的那道闸一路绿。
   const citeMiss = (raw, fromRaw, toRaw) => {
