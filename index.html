@@ -5,27 +5,18 @@
 <!-- 不写 <base>：页面既要在 http://host/ 下跑，也要在 GitHub Pages 的 /z-biz-game-slither-cos/
      前缀下跑。所有资源都用相对路径，动态 import 走 document.baseURI，硬编的 "/" 会在
      前缀形状下把 css 和引擎全部 404 掉。 -->
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /><meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#070A14" />
 <title>数回 · Slitherlink</title>
-<meta name="description" content="数回 Slitherlink：照着格子里的数字，把一条条边连成恰好一条不自交的闭环——数字是这一格四条边里在环上的条数。判胜只由引擎里那份独立的 verify 说了算。" />
-<!-- 图标是 assets/gen/make_art.py 现算的真位图（12 张，见 icons/）。不写内联 data-SVG：
-     那张小图既装不上桌面也上不了商店，而浏览器仍会去探 /favicon.ico。 -->
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
-<link rel="manifest" href="manifest.webmanifest" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="数回" />
-<meta property="og:type" content="website" />
-<meta property="og:title" content="数回 · Slitherlink" />
-<meta property="og:description" content="照着格子里的数字，把边连成恰好一条不自交的闭环。每一局都由引擎验过唯一解。" />
-<meta property="og:image" content="assets/social/og-1280x640.png" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:image" content="assets/social/og-1280x640.png" />
+<meta name="description" content="数回 Slitherlink：照着格子里的数字，把一条条边连成恰好一条不自交的闭环——数字是这一格四条边里在环上的条数。判胜只由引擎里那份独立的 verify 说了算。" /><meta property="og:title" content="数回 · Slitherlink"><meta property="og:description" content="数回 Slitherlink：照着格子里的数字，把一条条边连成恰好一条不自交的闭环——数字是这一格四条边里在环上的条数。判胜只由引擎里那份独立的 verify 说了算。"><meta property="og:image" content="https://z-biz-game.github.io/z-biz-game-slither-cos/icons/icon-512.png"><meta name="twitter:image" content="https://z-biz-game.github.io/z-biz-game-slither-cos/icons/icon-512.png">
+<!-- Inline icon: without it the browser probes the domain root for /favicon.ico and logs a 404. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2322304F'/%3E%3Cpath d='M8 8h16v16z' fill='none' stroke='%233A4C78' stroke-width='1'/%3E%3Cpath d='M8 8h16M8 24h16' fill='none' stroke='%23FFC85C' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='24' cy='8' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='8' cy='24' r='2' fill='%235A6E9E'/%3E%3Ccircle cx='24' cy='24' r='2' fill='%235A6E9E'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="css/game.css" />
+
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
 <div id="app">
@@ -36,19 +27,7 @@
     </div>
     <div class="top-actions">
       <span id="stat-tier" class="chip mono">—</span>
-      <button id="btn-pause" class="hud" type="button" aria-pressed="false" aria-label="暂停这一局的动画与时钟（P 或空格）" title="暂停 / 继续（P）">
-        <span class="hud-glyph" aria-hidden="true">❚❚</span><span class="hud-text">暂停</span>
-      </button>
-      <button id="btn-mute" class="hud" type="button" aria-pressed="false" aria-label="静音开关（M）" title="静音 / 开声（M）">
-        <span class="hud-glyph" aria-hidden="true">♪</span><span class="hud-text">开声</span>
-      </button>
-      <button id="btn-fullscreen" class="hud" type="button" aria-pressed="false" aria-label="全屏（F）" title="全屏（F）">
-        <span class="hud-glyph" aria-hidden="true">⤢</span><span class="hud-text">全屏</span>
-      </button>
-      <button id="btn-help" class="hud" type="button" aria-pressed="false" aria-label="玩法说明（H）" title="玩法说明（H）">
-        <span class="hud-glyph" aria-hidden="true">?</span><span class="hud-text">玩法</span>
-      </button>
-    </div>
+      <button id="btn-fullscreen" class="ghost" type="button" aria-pressed="false" title="全屏（F）">全屏</button></div>
   </header>
 
   <main>
@@ -93,7 +72,7 @@
         <div class="acts">
           <button id="btn-undo" class="ghost" type="button">撤销</button>
           <button id="btn-clear" class="ghost" type="button">全清</button>
-          <button id="btn-restart" class="ghost" type="button">重开本局</button>
+        <button id="btn-restart" class="ghost" type="button" title="重开同一题（R）">重开本题</button>
           <button id="btn-new" class="primary" type="button">新的一局</button>
         </div>
 
@@ -166,16 +145,6 @@
 </div>
 
 <script type="module" src="js/main.js"></script>
-<script>
-// 可安装性：sw.js 走「网络优先、失败退缓存」，出新 HTML 不会配旧 JS。
-// file:// 下没有 serviceWorker 这个 API（而且注册会抛），整段跳过——那不是玩家的错。
-if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
-  window.addEventListener('load', function () {
-    // 相对路径：GitHub Pages 的前缀形状（/z-biz-game-slither-cos/）下绝对路径会 404。
-    // scope 不传：默认就是 sw.js 所在目录，而 baseURI 可能带着 #expect= 片段（不是合法 scope）。
-    navigator.serviceWorker.register(new URL('sw.js', document.baseURI || './').href).catch(function () {});
-  });
-}
-</script>
+  <script src="js/sw-register.js"></script>
 </body>
 </html>

@@ -1,27 +1,26 @@
 {
-  "name": "数回 · Slitherlink",
+  "name": "数回",
   "short_name": "数回",
-  "description": "照着格子里的数字，把边连成恰好一条不自交的闭环。每一局都由引擎验过唯一解，判胜只有一处。",
-  "id": "./",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": ".",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "orientation": "any",
-  "background_color": "#070A14",
-  "theme_color": "#070A14",
-  "lang": "zh-CN",
-  "categories": ["games", "puzzle"],
+  "background_color": "#0a0a12",
+  "theme_color": "#0a0a12",
   "icons": [
-    { "src": "icons/favicon-32.png", "sizes": "32x32", "type": "image/png" },
-    { "src": "icons/icon-96.png", "sizes": "96x96", "type": "image/png" },
-    { "src": "icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-1024.png", "sizes": "1024x1024", "type": "image/png" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "screenshots": [
-    { "src": "assets/social/og-1280x640.png", "sizes": "1280x640", "type": "image/png", "form_factor": "wide", "label": "深蓝点阵盘面上的一条琥珀闭环" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

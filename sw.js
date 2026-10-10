@@ -1,47 +1,56 @@
 'use strict';
-// 离线壳。VERSION 换号 = 老缓存整仓作废，所以每次改 js/css 都要把它跟着 bump。
-const VERSION = 'slither-v0.1.1';
+// 离线可用 + 永不被旧缓存钉住。
+//
+// 两条实测换来的口径：
+//   1) 一律 **网络优先**，命中网络才回填缓存。手工 VERSION + cache-first 的组合，
+//      发出去的 HTML 会配上上一版的 js/css，出一个"新界面配旧逻辑"的鬼状态，
+//      而且玩家自己无法恢复（只能等缓存过期）。
+//   2) 缓存名带版本号（activate 时清掉非本版的名字）。改版**不需要**同步 bump：
+//      同名文件重绘之后，网络优先这一条保证客户端下一次联网就拿到新字节。
+const VERSION = 'slither-cos-v1';
+const CACHE = `${VERSION}-shell`;
+const PRECACHE = ['index.html', 'manifest.webmanifest'];
 
-// 只预取外壳：引擎与渲染层留给网络优先那条路，免得改一版 js 就被旧缓存钉死。
-const SHELL = ['./', './index.html', './css/game.css', './manifest.webmanifest',
-  './icons/favicon-32.png', './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png',
-  './assets/sprites/ripple-128.png'];
-
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(VERSION)
-      .then((c) => Promise.all(SHELL.map((u) => c.add(new Request(u, { cache: 'reload' })).catch(() => null))))
-      .then(() => self.skipWaiting())
+self.addEventListener('install', (ev) => {
+  // 首屏两件套先抓下来：断网时至少能打开界面，而不是浏览器的错误页。
+  ev.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(PRECACHE).catch(() => {})).then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+self.addEventListener('activate', (ev) => {
+  ev.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-// 网络优先、失败退缓存：同源子资源（js/css/png）永远先拿最新的一份，
-// 命中过网络才顺手回填。手工版本号 + cache-first 会把 js 钉死在旧版，
-// 出新 HTML 配旧 JS 那种鬼状态就是这么来的。
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
+self.addEventListener('fetch', (ev) => {
+  const req = ev.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  e.respondWith(
+
+  ev.respondWith(
     fetch(req)
       .then((res) => {
-        if (res && res.ok && res.type !== 'opaque') {
+        if (res && res.ok) {
           const copy = res.clone();
-          caches.open(VERSION).then((c) => c.put(req, copy)).catch(() => {});
+          caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
       })
-      .catch(() => caches.match(req).then((hit) => hit || (
-        req.mode === 'navigate' ? caches.match('./index.html') : Response.error()
-      )))
+      .catch(async () => {
+        const hit = await caches.match(req);
+        if (hit) return hit;
+        // 导航请求（地址栏/刷新/桌面图标）离线时回落到缓存的那份壳，不白屏。
+        if (req.mode === 'navigate') {
+          const shell = await caches.match('index.html');
+          if (shell) return shell;
+        }
+        return Response.error();
+      })
   );
 });

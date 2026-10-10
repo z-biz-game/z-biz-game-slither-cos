@@ -71,6 +71,16 @@ case "$SERVED" in *js/main.js*) ;; *) echo "nothing served at $BASE (see /tmp/sl
 echo "$SERVED" | grep -q 数回 || { echo "port $HTTP is serving a different app, not 数回 Slitherlink" >&2; exit 2; }
 echo "$SERVED" | grep -qi slither || { echo "port $HTTP is serving a different app, not 数回 Slitherlink" >&2; exit 2; }
 
+# ── 逻辑段（浏览器循环之前）：文档数字闸 + 破坏试验台账 ────────────────────────────────────────
+# 顺序是有意的：这两道闸只吃 node，一条撒谎的文档不该先花几十秒起 Chrome 再被发现有谎。
+# doctest 重算 README/DESIGN 里每一条"代码能算出来的数字"；sabotage 再把十三组的每一组真的破坏一遍，
+# 证明那些绿是磁盘上的字节给的，不是抄来的。两者的 rc 都折进 FAILED（见下面的 FAILED=$LOGIC_FAILED）。
+LOGIC_FAILED=0
+echo "=== doctest（文档数字闸：文档是被告，代码是基准）==="
+( cd "$HERE" && node tools/doctest.mjs ) || LOGIC_FAILED=1
+echo "=== sabotage（破坏试验台账：每把刀都得把闸带红）==="
+( cd "$HERE" && node tools/sabotage.mjs ) || LOGIC_FAILED=1
+
 UDD=$(mktemp -d)
 MUTBAK="$UDD/golden.mjs.orig"
 "$CHROME" --headless=new --remote-debugging-port=$PORT --user-data-dir=$UDD \
@@ -105,7 +115,7 @@ curl -fsS -m 2 "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1 || {
 export CDP_PORT=$PORT
 export BASE_URL=$BASE
 cd "$HERE"
-node tools/playtest.cjs open "$BASE" | head -5 || { echo "playtest 连不上 $BASE（见 /tmp/slither-chrome.log）" >&2; exit 3; }
+node tools/playtest.cjs open "$BASE" | head -5 || { echo "playtest 连不上 ${BASE}（见 /tmp/slither-chrome.log）" >&2; exit 3; }
 
 # RESULT <json> 是场景输出的最后一行，这里把它拆成人能读的一行行 + 退出码。
 # 场景日志的名字走环境 SCEN_LOG：在单引号的 python 串里写 "$SCEN" 的话，展开发生在**定义**
@@ -129,7 +139,7 @@ print("  %d checks, %d failed  %s" % (len(d["rows"]), d["fail"], extra if extra 
 sys.exit(1 if d["fail"] else 0)
 '
 
-FAILED=0
+FAILED=$LOGIC_FAILED
 TOTAL=0
 # run 不能被 $( ) 捕获：整个函数体会在子 shell 里跑，那里面的 FAILED=1 / TOTAL=… 出了函数就
 # 蒸发，于是一堆 FAIL 印在屏幕上、脚本照样 exit 0 —— 一个永不红的门禁。人读的东西直接走
@@ -260,7 +270,7 @@ if [ "$LOCAL" = 1 ]; then
     sleep 0.25
   done
   PRESERVED=$(curl -fsS -m 3 "$PRE" 2>/dev/null || true)
-  case "$PRESERVED" in *js/main.js*) ;; *) echo "  FAIL 前缀形状下拿不到本仓 index.html：$PRE（见 /tmp/slither-prefix-server.log）" >&2; FAILED=1 ;; esac
+  case "$PRESERVED" in *js/main.js*) ;; *) echo "  FAIL 前缀形状下拿不到本仓 index.html：${PRE}（见 /tmp/slither-prefix-server.log）" >&2; FAILED=1 ;; esac
   if [ -n "$PRESERVED" ]; then
     # open 而不是 eval：eval 默认会把 tab 导航回 BASE（根路径），那这一段就又在测一次根、
     # 前缀从来没被访问过——一个永远不会红的门禁。open 会先关掉本 origin 的旧 tab。
@@ -290,6 +300,11 @@ if [ "$LOCAL" = 1 ]; then
 fi
 
 kill $WD 2>/dev/null
-echo "=== 断言总数：$TOTAL（只印不判：条数是被测对象的性质，不是门禁的承诺） ==="
+echo "=== 断言总数：${TOTAL}（只印不判：条数是被测对象的性质，不是门禁的承诺） ==="
+# 部署集闸：ci.yml 跑这两步、本地整闸以前一次都不跑。缺这一步就是「本地全绿、线上 404 自己的
+# manifest / sw.js / 图标」这一整类坏法。它不碰 Chrome，也不读页面，纯查产物。
+echo "=== deploy-set ==="
+node tools/deploy-set.mjs || FAILED=1
+node tools/deploy-set-selftest.mjs || FAILED=1
 [ $FAILED -eq 0 ] && echo "=== ALL GREEN ===" || echo "=== FAILURES ABOVE ==="
 exit $FAILED

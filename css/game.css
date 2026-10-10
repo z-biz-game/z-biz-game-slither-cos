@@ -288,145 +288,101 @@ button.link {
 
 .foot code { font-family: var(--font-mono); }
 
-/* ---------- 触摸下限：控件的命中尺寸由这一节保证，不由"看着够大"保证 ---------- */
+/* 中央分发：safe-area 兜底 */
 
-/* 44px 是 iOS HIG 与 Material 共同的下限，也是数回玩家戴着手套点得中的下限。
-   min-width 与 min-height 同时给：HUD 那几个只有图标的按钮不然会塌成一条。 */
+/* ---------- safe-area：刘海与主屏条不吃掉按钮（中央分发，akari-cos 同口径） ---------- */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+html, body {
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
+body {
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* 贴边的固定/吸底元素自己让开主屏条，别让 home indicator 压住按钮 */
+.fixed-bottom, .bottom-bar, .hud-bottom, footer.app-footer {
+  padding-bottom: calc(var(--sab) + env(safe-area-inset-bottom, 0px));
+}
+
+
+/* ============================================================
+   44px 触摸命中下限（Apple HIG 手机可用性底线）
+   每个真正可点的元素都要有 ≥44×44 CSS px 的命中盒。
+   min-height / min-width 是**硬下限**：只会把过小的盒子撑到 44px，
+   本来就够大的控件（宽药丸、整行列表项、大数字键）外形一点不变。
+
+   两处非平凡之处：
+   1) 需要 !important —— 各组件自己有 `.shelf button { min-width: 34px }`
+      这类更"贴身"的规则，类选择器的优先级高于任何标签堆叠，
+      不加的话这条底线会被组件规则逐个抵消。
+   2) 先把 --touch-min 定死：tapa / nurikabe 早就写了
+      `min-height: var(--touch-min)`，但全仓没有任何地方定义过这个变量，
+      无 fallback 的 var() 在计算值阶段整条作废 —— 那是个看着像 44px、
+      实际什么都不保证的死规则。这里补上定义，让它们原本的意图真正成立。
+   ============================================================ */
+:root { --touch-min: 44px; }
 button,
 select,
-.hud {
-  min-height: 44px;
-  min-width: 44px;
+input,
+textarea,
+a[href],
+[role="button"] {
+  min-height: 44px !important;
+  min-width: 44px !important;
 }
 
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-gutter);
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.hud {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: var(--radius-button);
-  border: 1px solid var(--line);
-  background: var(--surface-lift);
-  color: var(--ink);
-  font: 600 12.5px/1 var(--font-sans);
-}
-
-.hud .hud-glyph { font-size: 15px; line-height: 1; color: var(--accent); }
-.hud[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); }
-.hud .hud-text { letter-spacing: 0.04em; }
-
-/* ---------- 特效层：叠在盘面那张正上方，绝不吃点击 ---------- */
-
-#fx-layer {
-  position: absolute;
-  pointer-events: none;
-  /* 这张 canvas 的 left/top 由 js/main.js 的 layout() 按 #board 的 offsetLeft/Top 写，
-     两张纸原点错开一像素，涟漪就会落在隔壁那条边上。 */
-  z-index: 2;
-}
-
-#pause-veil {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  background: rgba(7, 10, 20, 0.55);
-  border-radius: var(--radius-card);
-  pointer-events: auto;
-}
-
-.pause-line {
-  margin: 0;
-  padding: 10px 16px;
-  border-radius: var(--radius-chip);
-  border: 1px solid var(--info);
-  background: var(--surface-lift);
-  color: var(--ink);
-  font: 600 13px/1.5 var(--font-sans);
-}
-
-/* ---------- 玩法说明浮层 ---------- */
-
-#help-veil {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  display: grid;
-  place-items: center;
-  padding: calc(var(--space-page) + env(safe-area-inset-top)) calc(var(--space-page) + env(safe-area-inset-right))
-    calc(var(--space-page) + env(safe-area-inset-bottom)) calc(var(--space-page) + env(safe-area-inset-left));
-  background: rgba(7, 10, 20, 0.78);
-}
-
-.help-card {
-  max-width: 520px;
-  padding: var(--space-card);
-  border-radius: var(--radius-card);
-  background: var(--surface-lift);
-  border: 1px solid var(--accent);
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
-  animation: pop var(--dur-base) var(--ease-ease);
-  overflow: auto;
-}
-
-.help-card h3 { margin: 0 0 10px; font-size: 17px; letter-spacing: 0.05em; color: var(--accent); }
-.help-card .rules { margin-bottom: 12px; }
-
-.keys { width: 100%; border-collapse: collapse; font-size: 12.5px; color: var(--ink-dim); }
-.keys th {
-  width: 88px;
-  padding: 5px 8px 5px 0;
-  text-align: left;
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.keys td { padding: 5px 0; border-bottom: 1px solid var(--line); }
-
-/* ---------- 点阵底纹：仓里现算的那张可平铺 PNG，给面板与卡片当底 ---------- */
-
-.panel,
-.verify-box {
-  background-image: url('../assets/textures/lattice-512.png');
-  background-repeat: repeat;
-  background-size: 512px 512px;
-  background-blend-mode: soft-light;
-}
-
-.win-card,
-.help-card {
-  background-image: url('../assets/textures/lattice-512.png');
-  background-repeat: repeat;
-  background-size: 512px 512px;
-  background-blend-mode: soft-light;
-}
-
-/* ---------- 减弱动态效果：真分支，不是空块 ---------- */
-
+/* 减弱动效（prefers-reduced-motion）—— 真分支，不是空壳
+ *
+ * 本仓是**少数动效真在 CSS 上的仓**（不是 canvas 画出来的），所以这里用媒体查询就够，
+ * 不必往 js 里塞 matchMedia。两处装饰：
+ *   ① .win-card 的 animation: pop（scale 0.9→1 + opacity 0→1，通关卡片弹一下）
+ *   ② button 的 transition: transform（:active 时 translateY(1px) 的按压手感）
+ *
+ * 为什么减这两处、留下别的：pop 与按压位移都是**锦上添花** —— 弹一下不影响"你赢了"这件事
+ * 被看见，按下去的下沉也不影响按钮能被点到；颜色、边框、文案一概不动。
+ * 换句话说：动效去掉，信息一条不少。
+ *
+ * 注：上面那两条声明里的 var(--dur-win) / var(--dur-base) / var(--ease-ease) 在本仓
+ * :root 里并没有定义（只有 safe-area 四个与 --touch-min），所以整条 animation/transition
+ * 声明按 CSS 规范是 invalid 的、浏览器会丢掉。**本段的规则不依赖那三个变量**，写成
+ * animation: none / transition: none 这样的关键字，无论变量将来补不补都成立。
+ * 变量缺失这件事本身是另一笔账，不在本单范围，这里只如实记一句。 */
 @media (prefers-reduced-motion: reduce) {
+  /* 通关卡片：不再从 0.9 缩放、不再淡入，直接以最终样子出现 */
+  .win-card {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  @keyframes pop {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* 按钮按压：不再下沉那 1px，也不再渐变边框色 —— 命中区与配色一律照旧 */
+  button,
+  select,
+  input,
+  textarea,
+  a[href],
+  [role="button"] {
+    transition: none;
+  }
+  button:active { transform: none; }
+
+  /* 兜底：仓内任何将来新增的装饰性动画/过渡都归零（不含 scroll-behavior 之类会改布局的） */
   * {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-
-  .win-card,
-  .help-card {
-    animation: none;
-  }
-
-  button:active { transform: none; }
-  #fx-layer { display: none; } /* 涟漪、环上流动的光与辉光全在这张纸上 */
 }

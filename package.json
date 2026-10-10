@@ -16,8 +16,10 @@
     "census": "node tools/census.mjs",
     "balance": "node tools/balance.mjs",
     "golden": "node tools/write-golden.mjs",
-    "art": "python3 assets/gen/make_art.py",
-    "art:check": "python3 assets/gen/make_art.py --check"
+    "doctest": "node tools/doctest.mjs",
+    "sabotage": "node tools/sabotage.mjs",
+    "deploy-set": "node tools/deploy-set.mjs",
+    "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"
   },
   "license": "MIT"
 }

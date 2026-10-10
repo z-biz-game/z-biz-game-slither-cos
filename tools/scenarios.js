@@ -89,14 +89,35 @@
       })
     );
   }
+  // 每一笔留三页证据：页面自己的几何把那一下解析成了哪条边（hitEdgeLocal，与 rect 无关）、
+  // 画布在派发前后有没有挪动（rect 位移），以及那一笔之后目标边动没动。少了这三页，
+  // 「点齐了却没赢」只会红在 verify 那句「你画了 1 条」上，说不出是几何偏了、画布漂了、
+  // 被吞了（busy / 命中盒外），还是引擎不认。
+  const tapAudit = { strays: [], shifted: [], unmoved: [] };
   // 点一条边的中点：左键 button=0（ON ↔ 未知），右键 button=2（OFF ↔ 未知）
   async function tapEdge(e, button = 0) {
     const m = midOf(e);
-    if (!m) return false;
-    const p = clientOf(m.x, m.y);
+    if (!m) {
+      tapAudit.strays.push(`${e}:没有中点（盘面上没有这条边？cell=${A().view.geo.cell} E=${A().game.grid.E}）`);
+      return false;
+    }
+    const r0 = A().view.canvas.getBoundingClientRect();
+    const p = { x: r0.left + m.x, y: r0.top + m.y };
+    const before = A().game.val[e];
     pointer('pointerdown', p.x, p.y, button);
     pointer('pointerup', p.x, p.y, button);
     await wait(12);
+    const r1 = A().view.canvas.getBoundingClientRect();
+    if (r1.left !== r0.left || r1.top !== r0.top) {
+      tapAudit.shifted.push(`${e}:rect 从 (${Math.round(r0.left)},${Math.round(r0.top)}) 挪到 (${Math.round(r1.left)},${Math.round(r1.top)})`);
+    }
+    const local = A().view.hitEdgeLocal(m.x, m.y);
+    const resolved = A().view.hitEdge(p.x, p.y);
+    if (local !== e || resolved !== e) {
+      tapAudit.strays.push(`想点 ${e}：页面几何答 ${local}，按 client ${Math.round(p.x)},${Math.round(p.y)} 答 ${resolved}（cell=${A().view.geo.cell} 原点 ${Math.round(A().view.geo.x)},${Math.round(A().view.geo.y)}）`);
+    } else if (A().game.val[e] === before) {
+      tapAudit.unmoved.push(`${e}(val 仍是 ${before})`);
+    }
     return true;
   }
   async function clickSel(sel) {
@@ -142,6 +163,15 @@
   };
   const blankVal = (g) => Array.from(g.val).every((x) => x === 0);
   const onCount = (g) => Array.from(g.val).filter((x) => x === E().ON).length;
+  // 页面上这一圈 ON 边与冻结边集的差：红的时候要能说出「少了哪几条、多了哪几条」，
+  // 而不是只把 verify 那句「你画了 1 条」再抄一遍。
+  const onDiff = (g, rec) => {
+    const want = new Set(rec.edges);
+    const missing = rec.edges.filter((e) => g.val[e] !== E().ON);
+    const extra = [];
+    for (let e = 0; e < g.grid.E; e++) if (g.val[e] === E().ON && !want.has(e)) extra.push(e);
+    return `少 ON=${missing.join(',') || '无'} 多 ON=${extra.join(',') || '无'}`;
+  };
   const counts = (g) => {
     const raw = { on: 0, off: 0, un: 0 };
     for (let e = 0; e < g.grid.E; e++) raw[g.val[e] === E().ON ? 'on' : g.val[e] === E().OFF ? 'off' : 'un']++;
@@ -150,6 +180,9 @@
 
   // 冻结夹具的边号 → 屏幕中点 → 真指针。整圈点完就是一盘该赢的棋。
   async function playLoop(edges, skip = -1) {
+    tapAudit.strays.length = 0;
+    tapAudit.shifted.length = 0;
+    tapAudit.unmoved.length = 0;
     let n = 0;
     for (const e of edges) {
       if (e === skip) continue;
@@ -373,9 +406,15 @@
 
     // 补上那一条 → 同一盘立刻该赢，且横幅只由 verify 说 ok 才长出来
     await tapEdge(drop, 0);
+    // 先问笔，再问裁决：点偏 / 画布挪位 / 这一笔被吞，都要在 verify 之前自己认下来。
+    ck(
+      'play:这一圈每一笔都落在我要的那条边上（页面几何自认的命中 == 目标边，画布没挪，没有一笔被吞）',
+      tapAudit.strays.length === 0 && tapAudit.shifted.length === 0 && tapAudit.unmoved.length === 0,
+      `点偏=${tapAudit.strays.join(' ') || '无'} 挪动=${tapAudit.shifted.join(' ') || '无'} 被吞=${tapAudit.unmoved.join(' ') || '无'}`
+    );
     const stWin = g.status();
     v = veilRect();
-    ck('play:点齐 golden 环 → verify 说赢、横幅真的长出来（非零矩形）、环长就是 verify 给的 len 且等于冻结边数', stWin.ok === true && !v.hidden && v.w > 100 && v.h > 60 && text('#stat-verify') === '赢了' && text('#stat-len') === String(stWin.len) && stWin.len === rec.edges.length, `verify=${JSON.stringify({ ok: stWin.ok, len: stWin.len, why: stWin.why })} 冻结边数=${rec.edges.length} veil=${JSON.stringify(v)} DOM len=${text('#stat-len')} verify=${text('#stat-verify')}`);
+    ck('play:点齐 golden 环 → verify 说赢、横幅真的长出来（非零矩形）、环长就是 verify 给的 len 且等于冻结边数', stWin.ok === true && !v.hidden && v.w > 100 && v.h > 60 && text('#stat-verify') === '赢了' && text('#stat-len') === String(stWin.len) && stWin.len === rec.edges.length, `verify=${JSON.stringify({ ok: stWin.ok, len: stWin.len, fails: stWin.fails, why: stWin.why })} 冻结边数=${rec.edges.length} ${onDiff(g, rec)} veil=${JSON.stringify(v)} DOM len=${text('#stat-len')} verify=${text('#stat-verify')}`);
 
     const nLoopWin = countNear(P().accent, 12);
     ck('play:赢的盘面上环色像素真的铺开了', nLoopWin > rec.edges.length * 100, `环色像素=${nLoopWin}，${rec.edges.length} 条边的下界是 ${rec.edges.length * 100}`);

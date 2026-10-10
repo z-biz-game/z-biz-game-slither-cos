@@ -77,6 +77,16 @@ export class Game {
     return touched.length;
   }
 
+  // 重开专用：把这一局**整个**归零。注意它和 clearAll() 不是一回事 ——
+  // clearAll() 本身是一组可撤销的动作，会往 undoStack 里再压一条、moves 再加一。
+  // 重开如果只调 clearAll()，撤销栈和步数就永远回不到开局值（这正是简报点名的那类漏复位）。
+  resetAll() {
+    this.val.fill(UNKNOWN);
+    this.undoStack.length = 0;
+    this.moves = 0;
+    return this;
+  }
+
   // 唯一的判胜入口：把整个三态数组交出去，赢不赢是 verify 说的（见 js/engine/verify.js）。
   status() {
     return verify(this.grid, this.val, this.clues);
