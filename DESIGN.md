@@ -31,7 +31,7 @@
   `E = nH + nV = 2wh + w + h`（`js/engine/grid.js:15`）。4×4 是 40 条，6×6 是 84 条。
 - `cellEdges(t) = [上, 下, 左, 右]`，边的取值三态：`0` 未定 / `1` 在环上 / `2` 打叉。
 
-存档是一个长度 `E` 的三态串（`js/store.js:10` 的 `slither.save.v1` 里那条 `marks`），
+存档是一个长度 `E` 的三态串（`js/store.js:23` 的 `slither.save.v1` 里那条 `marks`），
 所以"恢复的是同一局"这句话可以被写成一次字符串相等——门禁的 `resume-set` 就是把它和引擎
 `encode()` 的读数并排比（本轮那把 5×5 的串：前 6 笔环 + 1 支叉，`moves: 7`）。
 

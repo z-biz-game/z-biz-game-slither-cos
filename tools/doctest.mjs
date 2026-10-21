@@ -308,32 +308,44 @@ if (inc('D7')) {
 // ── D8 页面读数与默认值：stat 单元、MAX_DRAWS、seed 串、存档键、键盘通道与按钮 ──────────────
 if (inc('D8')) {
   const stats = [...HTML.matchAll(/<div class="stat"><span>([^<]+)<\/span>/g)].map((m) => m[1]);
-  ok(stats.length === 6 && /侧栏六个读数/.test(README), `D8a index.html 现算 ${stats.length} 个 stat 读数单元 == README 那句「侧栏六个读数」`, stats.join('/'));
-  const docStatList = ((README.match(/侧栏六个读数（([^）]*)）/) || [])[1] || '').split(' / ');
+  ok(stats.length === 8 && /侧栏八个读数/.test(README), `D8a index.html 现算 ${stats.length} 个 stat 读数单元 == README 那句「侧栏八个读数」`, stats.join('/'));
+  const docStatList = ((README.match(/侧栏八个读数（([^）]*)）/) || [])[1] || '').split(' / ');
   ok(docStatList.length === stats.length && docStatList.join('/') === stats.join('/'), 'D8b README 那句「侧栏六个读数（…）」逐条等于 index.html 现值（改了页面就得同时改这句）', `代码 ${stats.join('/')} vs 文档 ${docStatList.join('/')}`);
   ok(/id="stat-on"/.test(HTML) && /id="stat-off"/.test(HTML) && stats.includes('环上的边'), 'D8c README 点名的两个读数 id 与名字在 index.html 里都存在', stats.join('/'));
   const md = (MAIN_SRC.match(/const MAX_DRAWS = (\d+);/) || [])[1];
   const docMd = [...DOCS.matchAll(/MAX_DRAWS = (\d+)/g)].map((m) => +m[1]);
   ok(!!md && docMd.length >= 1 && docMd.every((x) => x === +md), `D8d 文档「最多抽 MAX_DRAWS = ${md} 次」== main.js 现值（点到 ${docMd.length} 处）`, `代码 ${md} · 文档 ${docMd.join('/')}`);
-  ok(lineOf(MAIN_SRC, /const MAX_DRAWS/) === 32 && /js\/main\.js:32/.test(README), `D8e README 引用的 main.js:32 就是 MAX_DRAWS 现在那一行`, `代码 ${lineOf(MAIN_SRC, /const MAX_DRAWS/)}`);
+  ok(lineOf(MAIN_SRC, /const MAX_DRAWS/) === 34 && /js\/main\.js:34/.test(README), `D8e README 引用的 main.js:34 就是 MAX_DRAWS 现在那一行`, `代码 ${lineOf(MAIN_SRC, /const MAX_DRAWS/)}`);
   ok(/crypto\.getRandomValues/.test(MAIN_SRC) && !/dailySeed/.test(MAIN_SRC) && /不是\*\*按日期算的/.test(README),
     'D8f seed 由 crypto 抽字节、代码里没有按日期的 seed：文档那句「不是按日期算的」有代码背书', `getRandomValues=${/crypto\.getRandomValues/.test(MAIN_SRC)} · dailySeed=${/dailySeed/.test(MAIN_SRC)}`);
   ok(/4x4#1-21aa83dbc239/.test(README) && /#\$\{/.test(MAIN_SRC + GAME_SRC), 'D8g seed 串形态 4x4#1-21aa83dbc239 与代码里的拼接式同形（文档举例没跑偏）', `代码里有 #${'${'} 拼接=${/#\$\{/.test(MAIN_SRC + GAME_SRC)}`);
   const keyM = (STORE_SRC.match(/const KEY = '([^']+)';/) || [])[1];
   const docKey = [...DOCS.matchAll(/`([a-z]+\.save\.v\d+)`/g)].map((m) => m[1]);
-  ok(!!keyM && docKey.includes(keyM) && lineOf(STORE_SRC, /const KEY = /) === 10 && /js\/store\.js:10/.test(README),
-    `D8h 存档键 ${keyM} 由 store.js 现读，文档抄的是同一个串且引用 :10`, `代码 ${keyM} @store.js:10 · 文档 ${docKey.join('/')}`);
+  ok(!!keyM && docKey.includes(keyM) && lineOf(STORE_SRC, /const KEY = /) === 23 && /js\/store\.js:23/.test(README),
+    `D8h 存档键 ${keyM} 由 store.js 现读，文档抄的是同一个串且引用 :23`, `代码 ${keyM} @store.js:23 · 文档 ${docKey.join('/')}`);
   // 键盘通道：把"文档写的键集合 == 代码 ev.key 比对的键集合"钉成对应等式。
   // 不锁"没有键盘"（那会放过"加了键却没写文档"），也不锁死成 F/R 两个字面（那会让代码与文档一起改就永远绿）。
+  // 键名归一：小写；空格键的两种写法（' ' 与 'Spacebar'，还有文档侧的 'Space'）都算同一颗键。
+  const normKey = (s) => {
+    const t = String(s).toLowerCase();
+    return t === ' ' || t === 'spacebar' || t === 'space' ? 'space' : t;
+  };
   const kbSent = (README.match(/键盘通道 (\d) 颗键：([^\n]+)/) || [])[0] || '';
-  const docKeys = [...new Set([...kbSent.matchAll(/`([A-Za-z])`/g)].map((m) => m[1].toLowerCase()))].sort();
-  const kbGuard = (MAIN_SRC.match(/const k = ev\.key;\s*\n\s*if \(k !==[^\n]*\n/) || [])[0] || '';
-  const codeKeys = [...new Set([...kbGuard.matchAll(/'(.)'/g)].map((m) => m[1].toLowerCase()))].sort();
+  const docKeys = [...new Set([...kbSent.matchAll(/`([^`]+)`/g)].map((m) => normKey(m[1])))].sort();
+  // 代码侧：读 onKey 的函数体（先把行注释剥掉），把里面**真正拿字符串比对的键字面量**取出来。
+  // 只认 `k` / `lower` 跟字符串的等值比较：`typeof k === 'string'` 那种拿类型名比的，
+  // 用负向后顾排除掉——它比的不是键，是类型。
+  // 取字面量而不是取一张自报的表：表会漂，字面量不会——它就是键盘事件实际认的那几个键。
+  const onKeyAt = lineOf(MAIN_SRC, /function onKey\(/);
+  const onKeyBody = onKeyAt > 0
+    ? MAIN_SRC.split('\n').slice(onKeyAt - 1).join('\n').split(/^\}/m)[0].replace(/\/\/[^\n]*/g, '')
+    : '';
+  const codeKeys = [...new Set([...onKeyBody.matchAll(/(?<!\btypeof )\b(?:k|lower)\s*[=!]==\s*'([^']*)'/g)].map((m) => normKey(m[1])))].sort();
   const kbCount = kbSent ? +/键盘通道 (\d) 颗键/.exec(kbSent)[1] : -1;
   ok(docKeys.length >= 1 && codeKeys.length >= 1 && kbCount === codeKeys.length &&
      docKeys.join(',') === codeKeys.join(',') && !/没有键盘通道/.test(README) &&
      !/keydown|keyup|keypress/.test(GAME_SRC),
-     `D8i 文档那句「键盘通道 ${kbCount} 颗键」逐颗等于 main.js 的 keydown 比对键（引擎侧 js/ui/game.js 一颗都没有）`,
+     `D8i 文档那句「键盘通道 ${kbCount} 颗键」逐颗等于 main.js 的 onKey 比对键（引擎侧 js/ui/game.js 一颗都没有）`,
      `文档 ${docKeys.join('/')} vs 代码 ${codeKeys.join('/')} · 引擎侧 keydown=${/keydown/.test(GAME_SRC)}`);
   ok(/\/input\|textarea\|select\/i\.test\(t\.tagName/.test(MAIN_SRC) &&
      /if \(ev\.repeat \|\| ev\.metaKey \|\| ev\.ctrlKey \|\| ev\.altKey\) return;/.test(MAIN_SRC) &&
@@ -344,7 +356,14 @@ if (inc('D8')) {
      'D8i3 文档那句「开局进行中（busy）按 R 无效」== 代码里 restart 只在 !busy 时走',
      `代码 ${/if \(!busy\) restart\(\);/.test(MAIN_SRC)} · 文档 ${/开局进行中（`busy`）按 `R` 无效/.test(README)}`);
   const btns = [...HTML.matchAll(/<button\b/g)].length;
-  const named = [...HTML.matchAll(/<button id="btn-[\w-]+"[^>]*>([^<]+)<\/button>/g)].map((m) => m[1]);
+  // 按钮名册：DOM 顺序，每颗取它的**可见文字**。
+  // 顶栏那四颗 HUD 按钮是「图标 + 文字」两段（.hud-glyph / .hud-text），图标段带 aria-hidden，
+  // 所以取名时只认 .hud-text 那一段——不然名册里会混进 ❚❚、♪ 这些符号，那不是按钮名。
+  const named = [...HTML.matchAll(/<button id="btn-[\w-]+"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => {
+    const inner = m[1];
+    const hud = inner.match(/<span class="hud-text">([^<]*)<\/span>/);
+    return (hud ? hud[1] : inner.replace(/<[^>]*>/g, '')).trim();
+  });
   const btnM = README.match(/页面一共 (\d+) 颗按钮\s*（[^：]*：([^）]*)）/);
   const docBtns = btnM ? btnM[2].split(' / ') : [];
   ok(!!btnM && +btnM[1] === btns && named.length === btns && docBtns.join('/') === named.join('/'),
@@ -394,15 +413,15 @@ if (inc('D10')) {
     ['js/engine/counter.js', COUNTER_SRC, 'uf', /function uf\(\)/, 45],
     ['js/engine/grid.js', GRID_SRC, 'nH', /const nH = /, 13],
     ['js/engine/grid.js', GRID_SRC, 'E = nH + nV', /const E = nH \+ nV/, 15],
-    ['js/main.js', MAIN_SRC, 'MAX_DRAWS', /const MAX_DRAWS/, 32],
-    ['js/main.js', MAIN_SRC, 'drawPuzzle', /async function drawPuzzle/, 66],
-    ['js/store.js', STORE_SRC, 'slither.save.v1', /const KEY = 'slither\.save\.v1'/, 10],
+    ['js/main.js', MAIN_SRC, 'MAX_DRAWS', /const MAX_DRAWS/, 34],
+    ['js/main.js', MAIN_SRC, 'drawPuzzle', /async function drawPuzzle/, 83],
+    ['js/store.js', STORE_SRC, 'slither.save.v1', /const KEY = 'slither\.save\.v1'/, 23],
     ['js/engine/loop.js', LOOP_SRC, 'boundaryOf', /export function boundaryOf/, 12],
     ['js/engine/loop.js', LOOP_SRC, 'regionReport', /export function regionReport/, 96],
     ['js/engine/loop.js', LOOP_SRC, 'growRegion', /function growRegion/, 151],
     ['js/engine/loop.js', LOOP_SRC, 'generateLoop', /export function generateLoop/, 240],
-    ['index.html', HTML, 'canvas#board', /<canvas id="board"/, 45],
-    ['index.html', HTML, '右键那句', /右键：打个叉/, 63],
+    ['index.html', HTML, 'canvas#board', /<canvas id="board"/, 57],
+    ['index.html', HTML, '右键那句', /右键：打个叉/, 79],
   ];
   for (const [file, src, what, re, want] of ANCHORS) {
     const real = lineOf(src, re);
@@ -446,11 +465,11 @@ if (inc('D10')) {
   // 这两处是没人看的沉默谎言。所以按现算的锚点行首尾对账，而不是只看边界。
   const statLines = HTML.split('\n').map((l, i) => (/<div class="stat"><span>/.test(l) ? i + 1 : 0)).filter(Boolean);
   const statRange = (README.match(/\.stat` 在 `index\.html:(\d+)-(\d+)`/) || []);
-  ok(statLines.length === 6 && statRange.length === 3,
-    `D10e 文档那句「六个 .stat 在 index.html:NN-MM」解析到了、且页面现算确实有 6 个 stat 单元（解析不到就是这里红）`,
+  ok(statLines.length === 8 && statRange.length === 3,
+    `D10e 文档那句「八个 .stat 在 index.html:NN-MM」解析到了、且页面现算确实有 8 个 stat 单元（解析不到就是这里红）`,
     `代码 ${statLines.length} 个 · 文档 ${statRange[1] || '?'}-${statRange[2] || '?'}`);
-  ok(statLines.length === 6 && statRange.length === 3 && +statRange[1] === statLines[0] && +statRange[2] === statLines[statLines.length - 1],
-    `D10e2 那六个 .stat 现在坐在第 ${statLines[0]}-${statLines[statLines.length - 1]} 行，文档引用的范围必须就是这一头一尾`,
+  ok(statLines.length === 8 && statRange.length === 3 && +statRange[1] === statLines[0] && +statRange[2] === statLines[statLines.length - 1],
+    `D10e2 那八个 .stat 现在坐在第 ${statLines[0]}-${statLines[statLines.length - 1]} 行，文档引用的范围必须就是这一头一尾`,
     `代码 ${statLines.join(',')} vs 文档 ${statRange[1]}-${statRange[2]}`);
   const sideBtns = ['btn-undo', 'btn-clear', 'btn-restart']
     .map((id) => lineOf(HTML, new RegExp(`<button id="${id}"`)));
@@ -489,7 +508,7 @@ if (inc('D12')) {
   const UNPINNED = [
     ['U1', '难度表 engine ms 三列（18.3 / 30.6 / 31.5 等）', /18\.3 \/ 30\.6 \/ 31\.5/],
     ['U2', '每张出货代价 21.3ms / 70.9ms / 465.7ms', /465\.7ms/],
-    ['U3', '浏览器门禁 31 条断言 / 0 失败（boot 7…）', /31 条断言 \/ 0 失败/],
+    ['U3', '浏览器门禁 32 条断言 / 0 失败（boot 7…）', /32 条断言 \/ 0 失败/],
     ['U4', '天花板那批历史 seed 的 7×7 p95 4155 / 4450ms', /4155 \/ 4450ms/],
     ['U5', 'score ↔ engine ms 的 Spearman ρ（−0.29 / −0.72）', /Spearman ρ 在 5×5 是/],
     ['U6', 'loop-test 的 13 松 / 8107 严那一批分歧数', /13 松 \/ 8107 严/],

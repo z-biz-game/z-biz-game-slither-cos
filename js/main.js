@@ -111,21 +111,6 @@ function startWith(face) {
   return game;
 }
 
-// 重开：同一道题从头再来 —— 只清玩家的落子、撤销栈、步数和临时状态，**不换题**。
-// 与 newGame 的区别就在这里：newGame 去引擎重抽一道新题，那是「再来一局」；这里是「这题我搞砸了，重来」。
-function restart() {
-  if (!game) return null;
-  game.resetAll();          // val / undoStack / moves 一次归零
-  wonAt = -1;               // 计时停表
-  veilDismissed = false;    // 遮罩回到未看过
-  state.state = 'ready';
-  stateLine.textContent = '已重开 —— 同一道题，注记、撤销栈和步数都归零。';
-  layout();
-  render();
-  persist();                // 落盘也一并回到开局态，刷新页面不会又冒出半局的注记
-  return game;
-}
-
 async function newGame(sizeKey) {
   const size = TIERS.find((t) => t.key === sizeKey) || TIERS[0];
   busy = true;
@@ -350,22 +335,46 @@ function setMuted(on) {
   return sound.muted;
 }
 
-function toggleFullscreen() {
+// 全屏：只做特性检测，不嗅探 UA（iOS Safari 是 webkitRequestFullscreen，
+// 老 Edge 是 ms 前缀，而 UA 字符串随时会改）。查得出能力就进出，查不出就把按钮灰掉
+// 并把原因写进 title——不解释的禁用等于这功能没做完。
+// 文案只写进 .hud-text / .hud-glyph 两枚 span：直接写 btn.textContent 会把这两枚 span
+// 一起抹掉，之后回写全屏状态就找不到节点了。
+function fullscreenApi() {
   const el = document.documentElement;
   const d = document;
-  if (d.fullscreenElement || d.webkitFullscreenElement) {
-    const exit = d.exitFullscreen || d.webkitExitFullscreen;
-    if (typeof exit === 'function') Promise.resolve(exit.call(d)).catch(() => {});
+  return {
+    req: el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen,
+    exit: d.exitFullscreen || d.webkitExitFullscreen || d.msExitFullscreen,
+    current: d.fullscreenElement || d.webkitFullscreenElement || d.msFullscreenElement || null,
+  };
+}
+
+function markFullscreenUnsupported() {
+  const b = $('btn-fullscreen');
+  b.disabled = true;
+  b.title = '这个浏览器不提供元素全屏（iOS Safari 请用「添加到主屏幕」独立打开）';
+  stateLine.textContent = '这台设备的浏览器不给全屏（Electron / iOS Safari 常见），窗口最大化是等效做法。';
+}
+
+function toggleFullscreen() {
+  const { req, exit, current } = fullscreenApi();
+  if (current) {
+    if (typeof exit === 'function') Promise.resolve(exit.call(document)).catch(() => {});
     return false;
   }
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (typeof req === 'function') Promise.resolve(req.call(el)).catch(() => {});
-  else stateLine.textContent = '这台设备的浏览器不给全屏（Electron / iOS Safari 常见），窗口最大化是等效做法。';
+  if (typeof req !== 'function') {
+    markFullscreenUnsupported();
+    return false;
+  }
+  // fullscreen 返回 Promise，被拒时必须吃掉：iOS Safari 对多数非 video 元素直接拒绝，
+  // 让这个 rejection 冒泡出去会变成一条未捕获错误，整局游戏跟着挂。
+  Promise.resolve(req.call(document.documentElement)).catch(markFullscreenUnsupported);
   return true;
 }
 
 function syncFullscreenChip() {
-  const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const on = !!fullscreenApi().current;
   const b = $('btn-fullscreen');
   b.setAttribute('aria-pressed', String(on));
   b.querySelector('.hud-text').textContent = on ? '退出' : '全屏';
@@ -393,7 +402,6 @@ document.addEventListener('webkitfullscreenchange', syncFullscreenChip);
 
 $('btn-new').addEventListener('click', () => newGame(currentSize().key));
 $('btn-again').addEventListener('click', () => newGame(currentSize().key));
-$('btn-restart').addEventListener('click', () => restart());
 $('btn-close-veil').addEventListener('click', () => {
   veil.hidden = true;
   veilDismissed = true;
@@ -410,9 +418,9 @@ $('btn-clear').addEventListener('click', () => {
   render();
   persist();
 });
-// 重开本局：题面（seed）不动，笔迹、步数、时钟、粒子、辉光、光带相位全部归零。
+// 重开本题：题面（seed）不动，笔迹、步数、时钟、粒子、辉光、光带相位全部归零。
 // 换 seed 的那条路是 newGame，两条不许混——玩家要的是"这张盘我重来一次"。
-function restartGame() {
+function restart() {
   if (!game) return null;
   const face = { w: game.w, h: game.h, seed: game.seed, clues: game.clues };
   Store.pushRun(game.moves, false);
@@ -424,7 +432,7 @@ function restartGame() {
   persist();
   return game;
 }
-$('btn-restart').addEventListener('click', () => restartGame());
+$('btn-restart').addEventListener('click', () => restart());
 $('btn-reset').addEventListener('click', () => {
   Store.reset();
   stateLine.textContent = '存档已清空。';
@@ -432,12 +440,19 @@ $('btn-reset').addEventListener('click', () => {
 
 sizeSelect.addEventListener('change', () => newGame(currentSize().key));
 
-// ---- 键盘：Enter 开局、P/空格 暂停、R 重开、M 静音、F 全屏、H/? 教学 ----------------------
+// ---- 键盘：Enter 开局、P/空格 暂停、R 重开本题、M 静音、F 全屏、H/? 玩法、Esc 收起 ----------
+// 这段字面量就是「键盘通道」的唯一声明：README 那句「键盘通道 N 颗键」由文档闸逐颗对账它
+// （键名两边一样，少一颗或多一颗都红）。
+// 两处护栏写死在监听里：焦点在 input/textarea/select 里时一律不触发（输 seed 输到一半屏幕不能没），
+// repeat 与 meta/ctrl/alt 也一律忽略（按住 R 不该连着重开，Cmd+R 是浏览器刷新而不是重开本题）。
 function onKey(ev) {
-  const tag = (ev.target && ev.target.tagName) || '';
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return; // 别抢表单里的键
+  const t = ev.target;
+  if (t && /input|textarea|select/i.test(t.tagName)) return;
+  if (ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const k = ev.key;
-  const lower = typeof k === 'string' ? k.toLowerCase() : '';
+  // ev.key 在 keydown 上恒为字符串；万一来的是个没有 key 的合成事件，String() 兜住，
+  // 下面那些 lower === 'r' 的比较仍在比字符串而不是在比 undefined。
+  const lower = String(k).toLowerCase();
   if (k === 'Enter') {
     ev.preventDefault();
     newGame(currentSize().key);
@@ -446,7 +461,8 @@ function onKey(ev) {
     setPaused(!fx.paused);
   } else if (lower === 'r') {
     ev.preventDefault();
-    restartGame();
+    // 开局进行中（busy）按 R 无效：这时屏上还是上一局，重开的是一道马上要被换掉的题。
+    if (!busy) restart();
   } else if (lower === 'm') {
     ev.preventDefault();
     setMuted(!sound.muted);
@@ -457,6 +473,7 @@ function onKey(ev) {
     ev.preventDefault();
     setHelp(helpVeil.hidden);
   } else if (k === 'Escape') {
+    // 这里不 preventDefault：Esc 在全屏态里是浏览器退出全屏的键，拦下它就退不出全屏了。
     if (!helpVeil.hidden) setHelp(false);
     else if (fx.paused) setPaused(false);
   }
@@ -557,7 +574,6 @@ window.slither = {
   restart,
   playSeed,
   resumeLast,
-  restartGame,
   setPaused,
   setMuted,
   setHelp,
@@ -585,79 +601,8 @@ startLoop();
   await newGame(TIERS[0].key);
 })();
 
-// ---- 全屏开关（#btn-fullscreen）----
-// 绑的是本页 HUD 上真实存在的那个按钮。全屏最常见的假实现就是引用一个并不存在的
-// id：点下去什么也不会发生，量具却算它"已实现"。所以这里找不到按钮就直接不装。
-(function bindFullscreen() {
-  const btn = document.getElementById('btn-fullscreen');
-  if (!btn) return;
-  const root = document.documentElement;
-  // 只做特性检测，不嗅探 UA：iOS Safari 是 webkitRequestFullscreen，老 Edge 是 ms 前缀，
-  // 而 UA 字符串随时会改。"有没有这个能力"是查出来的，不是猜出来的。
-  const req = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
-  const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
-  const current = () => document.fullscreenElement || document.webkitFullscreenElement
-    || document.msFullscreenElement || null;
-
-  // 不支持也要给个说法：只把按钮灰掉而不解释，玩家会以为这功能没做完。
-  // supported 这枚标记不能省：下面 sync() 每次都会重写 title，不挡住的话，装的时候刚写
-  // 进去的人话原因会被随后的 sync() 立刻抹成"全屏 (F)"——禁用就变成一句没有理由的禁用。
-  let supported = !!req;
-  const unsupported = () => {
-    supported = false;
-    btn.disabled = true;
-    btn.title = '这个浏览器不提供元素全屏（iOS Safari 请用「添加到主屏幕」独立打开）';
-  };
-  if (!req) unsupported();
-
-  // fullscreen 返回 Promise，被拒时必须吃掉：iOS Safari 对多数非 video 元素直接拒绝，
-  // 让这个 rejection 冒泡出去会变成一条未捕获错误，整局游戏跟着挂。
-  const settle = (p) => { if (p && p.catch) p.catch(unsupported); };
-
-  // 进出都能走：已经全屏时这次调用是退出，不是"再进一次"。
-  function toggle() {
-    try {
-      if (current()) {
-        if (exit) settle(exit.call(document));
-      } else if (req) {
-        settle(req.call(root));
-      } else {
-        unsupported();
-      }
-    } catch (e) {
-      unsupported();
-    }
-  }
-
-  // Esc 和系统手势退出都不经过我们的代码，按钮状态只能靠 fullscreenchange 回写，
-  // 否则用户已经退出、HUD 还停在"退出全屏"，下一次点击反而会重新进全屏。
-  function sync() {
-    const on = !!current();
-    btn.setAttribute('aria-pressed', String(on));
-    btn.textContent = on ? "退出全屏" : "全屏";
-    if (supported) btn.title = "全屏" + '（F）';
-    const body = document.body;
-    if (body && body.classList) body.classList.toggle('fullscreen', on);
-  }
-
-  btn.addEventListener('click', toggle);
-  window.addEventListener('keydown', (ev) => {
-    const k = ev.key;
-    if (k !== 'f' && k !== 'F' && k !== 'r' && k !== 'R') return;
-    const t = ev.target;
-    // 盘号 / 种子这类输入框里打字不能触发全屏或重开，否则玩家输 seed 输到一半屏幕没了。
-    if (t && /input|textarea|select/i.test(t.tagName || '')) return;
-    if (ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
-    ev.preventDefault();
-    if (k === 'r' || k === 'R') {
-      // 重开要能在**开局进行中**按，不只是结算后 —— 局中按 R 就地重来。
-      if (!busy) restart();
-      return;
-    }
-    toggle();
-  });
-  window.addEventListener('fullscreenchange', sync);
-  window.addEventListener('webkitfullscreenchange', sync);
-  window.addEventListener('MSFullscreenChange', sync);
-  sync();
-})();
+// ---- 全屏开关（#btn-fullscreen）----------------------------------------------------
+// 全屏只有这一份实现：上面 toggleFullscreen() 负责进出，syncFullscreenChip() 负责把状态
+// 回写到 HUD 那枚按钮的 .hud-text / .hud-glyph 上；Esc 与系统手势退出都不经过我们的代码，
+// 所以状态只能靠 fullscreenchange 回写，否则用户已经退出、HUD 还停在「退出全屏」，
+// 下一次点击反而会重新进全屏。

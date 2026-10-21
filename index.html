@@ -27,7 +27,19 @@
     </div>
     <div class="top-actions">
       <span id="stat-tier" class="chip mono">—</span>
-      <button id="btn-fullscreen" class="ghost" type="button" aria-pressed="false" title="全屏（F）">全屏</button></div>
+      <button id="btn-pause" class="hud" type="button" aria-pressed="false" aria-label="暂停这一局的动画与时钟（P 或空格）" title="暂停 / 继续（P）">
+        <span class="hud-glyph" aria-hidden="true">❚❚</span><span class="hud-text">暂停</span>
+      </button>
+      <button id="btn-mute" class="hud" type="button" aria-pressed="false" aria-label="静音开关（M）" title="静音 / 开声（M）">
+        <span class="hud-glyph" aria-hidden="true">♪</span><span class="hud-text">开声</span>
+      </button>
+      <button id="btn-fullscreen" class="hud" type="button" aria-pressed="false" aria-label="全屏（F）" title="全屏（F）">
+        <span class="hud-glyph" aria-hidden="true">⤢</span><span class="hud-text">全屏</span>
+      </button>
+      <button id="btn-help" class="hud" type="button" aria-pressed="false" aria-label="玩法说明（H）" title="玩法说明（H）">
+        <span class="hud-glyph" aria-hidden="true">?</span><span class="hud-text">玩法</span>
+      </button>
+    </div>
   </header>
 
   <main>
@@ -130,7 +142,7 @@
         <tbody>
           <tr><th>Enter</th><td>换一张新题面（新的一局）</td></tr>
           <tr><th>P / 空格</th><td>暂停 / 继续：仿真与时钟都停下，画面不丢状态</td></tr>
-          <tr><th>R</th><td>重开本局：同一张题面清掉笔迹，用时与动效一并复位</td></tr>
+          <tr><th>R</th><td>重开本题：同一张题面清掉笔迹，用时与动效一并复位</td></tr>
           <tr><th>M</th><td>静音 / 开声：真挂起 AudioContext，静音时不再新建振荡器</td></tr>
           <tr><th>F</th><td>全屏</td></tr>
           <tr><th>H / ?</th><td>开合这一页</td></tr>

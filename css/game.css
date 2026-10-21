@@ -73,6 +73,36 @@ body { touch-action: manipulation; }
   color: var(--ink-dim);
 }
 
+/* ---------- 顶栏右列：档位牌 + 四颗 HUD 按钮 ---------- */
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gutter);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* HUD 按钮是「图标 + 文字」两段：图标那枚走 --accent，文字那枚给字距。
+   按下态靠 aria-pressed 换边框与底色——aria-pressed 是真状态（暂停中/静音中/全屏中），
+   不是纯装饰的 :active。 */
+.hud {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--line);
+  background: var(--surface-lift);
+  color: var(--ink);
+  font: 600 12.5px/1 var(--font-sans);
+}
+
+.hud .hud-glyph { font-size: 15px; line-height: 1; color: var(--accent); }
+.hud[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); }
+.hud .hud-text { letter-spacing: 0.04em; }
+
 /* ---------- layout ---------- */
 
 .view {
@@ -143,6 +173,39 @@ body { touch-action: manipulation; }
   cursor: crosshair;
 }
 
+/* ---------- 特效层：叠在盘面那张正上方，绝不吃点击 ---------- */
+
+#fx-layer {
+  position: absolute;
+  pointer-events: none;
+  /* 这张 canvas 的 left/top 由 js/main.js 的 layout() 按 #board 的 offsetLeft/Top 写，
+     两张纸原点错开一像素，涟漪就会落在隔壁那条边上。 */
+  z-index: 2;
+}
+
+/* ---------- 暂停遮罩：盖住盘面，按键还能穿过去收掉它 ---------- */
+
+#pause-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: rgba(7, 10, 20, 0.55);
+  border-radius: var(--radius-card);
+  pointer-events: auto;
+}
+
+.pause-line {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--info);
+  background: var(--surface-lift);
+  color: var(--ink);
+  font: 600 13px/1.5 var(--font-sans);
+}
+
 .state-line {
   margin: 0;
   min-height: 20px;
@@ -187,6 +250,46 @@ body { touch-action: manipulation; }
 .win-card .win-meta { color: var(--accent); font-size: 12.5px; }
 .win-card code { font-family: var(--font-mono); font-size: 12px; color: var(--ink); }
 .win-actions { display: flex; gap: var(--space-gutter); }
+
+/* ---------- 玩法说明浮层（H / ? 开关的那一块） ---------- */
+
+#help-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--space-page) + env(safe-area-inset-top)) calc(var(--space-page) + env(safe-area-inset-right))
+    calc(var(--space-page) + env(safe-area-inset-bottom)) calc(var(--space-page) + env(safe-area-inset-left));
+  background: rgba(7, 10, 20, 0.78);
+}
+
+.help-card {
+  max-width: 520px;
+  padding: var(--space-card);
+  border-radius: var(--radius-card);
+  background: var(--surface-lift);
+  border: 1px solid var(--accent);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+  animation: pop var(--dur-base) var(--ease-ease);
+  overflow: auto;
+}
+
+.help-card h3 { margin: 0 0 10px; font-size: 17px; letter-spacing: 0.05em; color: var(--accent); }
+.help-card .rules { margin-bottom: 12px; }
+
+/* 键位表：键名那一列用等宽字体，不折行——键位表最怕的是「P / 空格」被拆到两行里。 */
+.keys { width: 100%; border-collapse: collapse; font-size: 12.5px; color: var(--ink-dim); }
+.keys th {
+  width: 88px;
+  padding: 5px 8px 5px 0;
+  text-align: left;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.keys td { padding: 5px 0; border-bottom: 1px solid var(--line); }
 
 /* ---------- 右侧面板 ---------- */
 
@@ -339,22 +442,35 @@ a[href],
   min-width: 44px !important;
 }
 
+/* ---------- 点阵底纹：仓里现算的那张可平铺 PNG，给面板与卡片当底 ---------- */
+/* 放在这些块的 background 之后：background 简写会把 background-image 复位成 none，
+   写在前面就等于没写。soft-light 让纹理只改明暗、不改色相，琥珀色的环不会被底纹吃掉。 */
+.panel,
+.verify-box,
+.win-card,
+.help-card {
+  background-image: url('../assets/textures/lattice-512.png');
+  background-repeat: repeat;
+  background-size: 512px 512px;
+  background-blend-mode: soft-light;
+}
+
 /* 减弱动效（prefers-reduced-motion）—— 真分支，不是空壳
  *
  * 本仓是**少数动效真在 CSS 上的仓**（不是 canvas 画出来的），所以这里用媒体查询就够，
- * 不必往 js 里塞 matchMedia。两处装饰：
- *   ① .win-card 的 animation: pop（scale 0.9→1 + opacity 0→1，通关卡片弹一下）
+ * 不必往 js 里塞 matchMedia。三处装饰：
+ *   ① .win-card / .help-card 的 animation: pop（scale 0.9→1 + opacity 0→1，卡片弹一下）
  *   ② button 的 transition: transform（:active 时 translateY(1px) 的按压手感）
+ *   ③ #fx-layer 那张纸上的涟漪、环上流动的光与辉光（js/main.js 里还有一道同口径的 JS 分支）
  *
- * 为什么减这两处、留下别的：pop 与按压位移都是**锦上添花** —— 弹一下不影响"你赢了"这件事
+ * 为什么减这三处、留下别的：pop 与按压位移都是**锦上添花** —— 弹一下不影响"你赢了"这件事
  * 被看见，按下去的下沉也不影响按钮能被点到；颜色、边框、文案一概不动。
  * 换句话说：动效去掉，信息一条不少。
  *
- * 注：上面那两条声明里的 var(--dur-win) / var(--dur-base) / var(--ease-ease) 在本仓
- * :root 里并没有定义（只有 safe-area 四个与 --touch-min），所以整条 animation/transition
- * 声明按 CSS 规范是 invalid 的、浏览器会丢掉。**本段的规则不依赖那三个变量**，写成
- * animation: none / transition: none 这样的关键字，无论变量将来补不补都成立。
- * 变量缺失这件事本身是另一笔账，不在本单范围，这里只如实记一句。 */
+ * 注：上面那两条声明里的 var(--dur-win) / var(--dur-base) / var(--ease-ease) 是
+ * js/theme.js 的 applyThemeVars() 在运行时写进 :root 的（颜色与几何的唯一来源），
+ * 所以 animation/transition 声明是成立的。**本段的规则仍然不依赖那三个变量**，写成
+ * animation: none / transition: none 这样的关键字：变量将来改名或缺席，这一段照样成立。 */
 @media (prefers-reduced-motion: reduce) {
   /* 通关卡片：不再从 0.9 缩放、不再淡入，直接以最终样子出现 */
   .win-card {
@@ -362,6 +478,8 @@ a[href],
     opacity: 1;
     transform: none;
   }
+  /* 玩法说明浮层：同一支 pop，也一样退化成静图 */
+  .help-card { animation: none; }
   @keyframes pop {
     from { transform: scale(1); opacity: 1; }
     to { transform: scale(1); opacity: 1; }
@@ -377,6 +495,11 @@ a[href],
     transition: none;
   }
   button:active { transform: none; }
+
+  /* 特效层整张纸收掉：涟漪、环上流动的光与辉光全画在这张纸上。
+     js/main.js 里还有一道同口径的 JS 分支（matchMedia），两道都留着：
+     CSS 这道管住"纸在不在"，JS 那道管住"仿真是不是还在跑"。 */
+  #fx-layer { display: none; }
 
   /* 兜底：仓内任何将来新增的装饰性动画/过渡都归零（不含 scroll-behavior 之类会改布局的） */
   * {

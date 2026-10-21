@@ -80,8 +80,8 @@ const KNIVES = [
     file: 'index.html',
     from: '<div class="stat"><span>环上的边</span>',
     to: '<div class="stat stat-x"><span>环上的边</span>',
-    breaks: '把第一颗侧栏读数的容器类名改掉（`class="stat"` 的枚举就少一个）——文档那句「侧栏六个读数（环上的边 / …）」当场数不到六个，也不认识第一个名字',
-    assert: /^\s*FAIL .*D8a index\.html 现算 5 个 stat 读数单元.*$/m,
+    breaks: '把第一颗侧栏读数的容器类名改掉（`class="stat"` 的枚举就少一个）——文档那句「侧栏八个读数（环上的边 / …）」当场数不到八个，也不认识第一个名字',
+    assert: /^\s*FAIL .*D8a index\.html 现算 7 个 stat 读数单元.*$/m,
     rc: '1',
   },
   {
