@@ -231,11 +231,13 @@ rows: 190 fail: 0
   ok   K11［D11］package.json → rc=1 · 点名：FAIL D11a package.json 有 doctest 与 sabotage 两条 script 且都指向本仓 tools/ · doctest=undefined · sabotage=node tools/sabotage.mjs
   ok   K12［D12］tools/doctest.mjs → rc=1 · 点名：FAIL D12 U1「难度表 engine ms 三列（18.3 / 30.6 / 31.5 等）」还写在文档里（钉不住 ≠ 可以删；删了就是这一条红） · 0 处
   ok   K13［D13］tools/doctest.mjs → rc=1 · 点名：FAIL D13e 子集内 D3 发 7 项 == 钉的 6 · 钉 6 vs 实发 7
+  ok   K14［D14］README.md → rc=1 · 点名：FAIL D14a README/ci.yml/verify.sh 里每一处「N把刀 / N个组 / N组红」== 现量的刀数与组数（个位数汉字写法与台账源码自己的刀口文案不在射程） · 6 处读数 · 现量刀 14 · 组 14 · 说谎：十五把刀(把刀 要 14)
 
 === 控制跑（干净树 · 整跑 · 与刀口子集对照）===
   ok   doctest 整跑 rc=0（还原不彻底就是这里红）
   ok   npm run check rc=0 · 37/37 个文件
   ok   收尾 git status：除本脚本的 rc: 自钉之外没有第二个改动
+十四把刀覆盖的组：D1 / D10 / D11 / D12 / D13 / D14 / D2 / D3 / D4 / D5 / D6 / D7 / D8 / D9（14 组互不相同）· 否决项 0
 === 台账全绿：每一把刀都红过、都点过名、都逐字节还原了 ===
 
 === boot ===
