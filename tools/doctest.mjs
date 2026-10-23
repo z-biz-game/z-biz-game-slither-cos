@@ -526,10 +526,52 @@ if (inc('D12')) {
     'D12b 「代码 > 文档」与「读数是某一轮的」两句免责都在（说谎的是文档，要改的就是文档）', '三句都在');
 } else skip('D12', 'UNPINNED 清单组');
 
+// ── 本闸的钉表：D13 自钉要用，D14 拿它和台账对形状也要用，所以两组之前先声明 ──────────────────
+const EXPECT_GROUPS = 14;
+const EXPECT_ROWS = 190;
+const EXPECT_ROWS_BY_GROUP = { D1: 15, D2: 11, D3: 7, D4: 4, D5: 12, D6: 37, D7: 13, D8: 12, D9: 6, D10: 33, D11: 8, D12: 11, D14: 4 };
+
+// ── D14 台账的形状：README/台账源码里写成人话的刀数与组数，每一处都要等于现量 ──────────────────
+// 为什么单独立一组：台账的规矩 1 只数「有没有两把刀挤在同一组」，它抓不到**少一把**——
+// 把 K8 删掉后端台账 12 把全绿，而 README 还写着「十三把刀、十三组红」，D6 从此没有证人。
+// 汉字数目只认「十…」这类两位数和阿拉伯数字：「每一把刀」「一把刀一组」是散文里的单数，
+// 认它们就是把话讲反（这一条的射程写在 detail 里，不假装覆盖个位数写法）。
+if (inc('D14')) {
+  const SAB_SRC = read('tools/sabotage.mjs');
+  const CN = { 十: 10, 十一: 11, 十二: 12, 十三: 13, 十四: 14, 十五: 15, 十六: 16, 十七: 17, 十八: 18, 十九: 19 };
+  const asNum = (s) => (/^\d+$/.test(s) ? +s : CN[s]);
+  const KNIFE_COUNT = (SAB_SRC.match(/id: 'K\d+'/g) || []).length;
+  const WANTS = { 把刀: KNIFE_COUNT, 个组: EXPECT_GROUPS, 组红: EXPECT_GROUPS };
+  // 扫 README + ci.yml + verify.sh：三处都用散文写了同一句刀数， workflow 的注释一样会说谎。
+  // 不扫台账源码本身：它的 from/to 两段**就是**被写坏的读数（「十五把刀」），扫它等于把自己的刀口当谎言。
+  const claims = [...(README + '\n' + CI + '\n' + VERIFY).matchAll(/(十[一二三四五六七八九]?|\d{1,2})(把刀|个组|组红)/g)];
+  const wrong = claims.filter((m) => asNum(m[1]) !== WANTS[m[2]]);
+  ok(claims.length >= 3 && wrong.length === 0,
+    'D14a README/ci.yml/verify.sh 里每一处「N把刀 / N个组 / N组红」== 现量的刀数与组数（个位数汉字写法与台账源码自己的刀口文案不在射程）',
+    `${claims.length} 处读数 · 现量刀 ${KNIFE_COUNT} · 组 ${EXPECT_GROUPS}${wrong.length ? ' · 说谎：' + wrong.map((m) => `${m[0]}(${m[2]} 要 ${WANTS[m[2]]})`).join(' ') : ''}`);
+
+  const covered = [...new Set((SAB_SRC.match(/group: 'D\d+'/g) || []).map((s) => s.match(/'D\d+'/)[0].slice(1, -1)))];
+  const ALLG = [...Object.keys(EXPECT_ROWS_BY_GROUP), 'D13'];
+  const missing = ALLG.filter((g) => !covered.includes(g));
+  const extra = covered.filter((g) => !ALLG.includes(g));
+  ok(missing.length === 0 && extra.length === 0 && covered.length === KNIFE_COUNT && KNIFE_COUNT === EXPECT_GROUPS,
+    `D14b doctest 的每一组都有且只有一把刀（少一把就是那一组没有证人；刀数≠组数说明有两把挤在同一组）`,
+    `覆盖 ${covered.length} 组 / 刀 ${KNIFE_COUNT} 把 / 钉表 ${EXPECT_GROUPS} 组${missing.length ? ' · 没有刀的组：' + missing.join(' ') : ''}${extra.length ? ' · 点名了不存在的组：' + extra.join(' ') : ''}`);
+
+  const derivedPrint = /console\.log\(`\\n\$\{[^}]*\}把刀覆盖的组/.test(SAB_SRC);
+  ok(derivedPrint,
+    'D14c 台账末尾那句「N把刀覆盖的组」的 N 由 KNIVES/groups 现量派生，不是散文里写死的数目（写死的打印会跟着删掉的刀一起说谎）',
+    derivedPrint ? '汇总行用 ${} 派生' : '汇总行仍把刀数写死在散文里');
+
+  const DELIV = read('deliverable.md');
+  const rowClaims = [...(README + '\n' + DELIV).matchAll(/(?:合计 |)(\d{2,3}) 项(?:不减| 0 红|（组：)/g)];
+  const rowWrong = rowClaims.filter((m) => +m[1] !== EXPECT_ROWS);
+  ok(rowClaims.length >= 3 && rowWrong.length === 0,
+    `D14d 文档抄的「合计 N 项 / N 项不减 / N 项 0 红」== 本闸钉的整跑项数 ${EXPECT_ROWS}（改了断言不重抄读数，就是这里红）`,
+    `${rowClaims.length} 处 · ${[...new Set(rowClaims.map((m) => m[1]))].join('/')} vs 钉 ${EXPECT_ROWS}${rowWrong.length ? ' · 说谎：' + rowWrong.map((m) => m[0].trim()).join(' ') : ''}`);
+} else skip('D14', '台账形状组');
+
 // ── D13 自钉：本闸的组数、每组项数、总项数都钉死；窄化（删断言）在这里红，并点名那一组 ────────
-const EXPECT_GROUPS = 13;
-const EXPECT_ROWS = 185;
-const EXPECT_ROWS_BY_GROUP = { D1: 15, D2: 11, D3: 7, D4: 4, D5: 12, D6: 37, D7: 13, D8: 12, D9: 6, D10: 33, D11: 8, D12: 11 };
 const included = [...rowsByGroup.keys()];
 const pinnedFor = included.reduce((a, g) => a + (EXPECT_ROWS_BY_GROUP[g] || 0), 0);
 const before = rows;
@@ -539,11 +581,11 @@ ok(docGateGroups !== undefined && +docGateGroups === EXPECT_GROUPS,
   `文档 ${docGateGroups} vs 钉表 ${EXPECT_GROUPS} 组 / ${EXPECT_ROWS} 项`);
 if (ONLY.length === 0) {
   ok(included.length === EXPECT_GROUPS - 1 && Object.keys(EXPECT_ROWS_BY_GROUP).every((g) => rowsByGroup.has(g)),
-    `D13a 整跑把钉表里 D1–D12 这 ${EXPECT_GROUPS - 1} 组都发到了（快照取在 D13 自己那组开始计数之前，少一组就是这里红）`,
+    `D13a 整跑把钉表里 ${Object.keys(EXPECT_ROWS_BY_GROUP).join(' ')} 这 ${EXPECT_GROUPS - 1} 组都发到了（快照取在 D13 自己那组开始计数之前，少一组就是这里红）`,
     included.slice().sort((a, b) => +a.slice(1) - +b.slice(1)).join(' '));
-  ok(before === Object.values(EXPECT_ROWS_BY_GROUP).reduce((a, b) => a + b, 0), `D13b D1–D12 共发 ${before} 项 == 钉表合计（钉表改了或组内增删一条都要两边一起改）`, `实发 ${before} · 钉表合计 ${Object.values(EXPECT_ROWS_BY_GROUP).reduce((a, b) => a + b, 0)}`);
-  const selfRows = Object.keys(EXPECT_ROWS_BY_GROUP).length + 4; // D13 这一组自己发 16 项：z/a/b/d + 每组一条 c
-  ok(before + selfRows === EXPECT_ROWS, `D13d 本闸整跑项数 == 钉的 ${EXPECT_ROWS}（D1–D12 的 ${before} 项 + D13 自己的 ${selfRows} 项；增/删一条 ok() 都要同时改这里的钉，否则窄化就是红的）`,
+  ok(before === Object.values(EXPECT_ROWS_BY_GROUP).reduce((a, b) => a + b, 0), `D13b 钉表各组共发 ${before} 项 == 钉表合计（钉表改了或组内增删一条都要两边一起改）`, `实发 ${before} · 钉表合计 ${Object.values(EXPECT_ROWS_BY_GROUP).reduce((a, b) => a + b, 0)}`);
+  const selfRows = Object.keys(EXPECT_ROWS_BY_GROUP).length + 4; // D13 自己发 z/a/b/d 四条 + 钉表里每组一条 c
+  ok(before + selfRows === EXPECT_ROWS, `D13d 本闸整跑项数 == 钉的 ${EXPECT_ROWS}（钉表各组的 ${before} 项 + D13 自己的 ${selfRows} 项；增/删一条 ok() 都要同时改这里的钉，否则窄化就是红的）`,
     `实发 ${before} + ${selfRows} = ${before + selfRows} vs 钉 ${EXPECT_ROWS}`);
   for (const [g, want] of Object.entries(EXPECT_ROWS_BY_GROUP)) {
     const got = rowsByGroup.get(g);

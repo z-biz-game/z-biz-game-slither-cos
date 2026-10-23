@@ -214,8 +214,8 @@ $ bash tools/verify.sh
   ok   D8j 文档那句「页面一共 12 颗按钮」逐颗等于 index.html 现在的 12 颗 <button>（顺序与名字都算）
   ok   D10e2 那八个 .stat 现在坐在第 92-99 行，文档引用的范围必须就是这一头一尾 · 代码 92,93,94,95,96,97,98,99 vs 文档 92-99
   ok   D10f2 侧栏那三颗现在在第 85-87 行，文档的范围必须罩得住它们 · 代码 85,86,87 vs 文档 85-87
-合计 185 项（组：D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12）· 失败 0 项 · 整跑
-rows: 185 fail: 0
+合计 190 项（组：D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12 D14）· 失败 0 项 · 整跑
+rows: 190 fail: 0
 
 === sabotage（破坏试验台账：每把刀都得把闸带红）===
   ok   K1［D1］js/engine/generate.js → rc=1 · 点名：FAIL D1e 天花板 CEILING = 7×7 就是表里最大那档（DESIGN §7 那句） · CEILING 7×7 vs 末档 6×6

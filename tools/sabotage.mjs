@@ -2,7 +2,8 @@
 // 破坏试验台账（sabotage ledger）——六条门里的"这条闸真的在吃磁盘上那批字节"那一条。
 //
 // 规矩（和 doctest 一样硬）：
-//   1. 每一把刀破坏的是**不同一组**断言（group 列），十三把刀不许挤在同一组里充数。
+//   1. 每一把刀破坏的是**不同一组**断言（group 列），十四把刀不许挤在同一组里充数；反过来每一组
+//      都必须有刀——少一把就是那一组没有证人，这一条由 doctest 的 D14b 从闸那边盯着。
 //   2. 每一把刀都必须把闸带红（rc≠0），而且日志里必须出现**它杀掉的那条 FAIL 原文**——
 //      assert 匹配的是打出来的那一行，不是转述；匹配不到就记 '(日志里没有点名的那条 FAIL)'，
 //      本脚本随之判红。一把从没红过的刀不算证人。
@@ -42,15 +43,15 @@ if (dirty.length) {
 
 // 刀口跑的子集：D5（四套引擎测试的条数）不参与——那两套是分钟级，且本台账破坏的是"文档 ↔ 代码"
 // 这一层，不是引擎测试本身。doctest 收到这个变量会打印 NOTE，不会静默少跑一组。
-const SUBSET = 'D1,D2,D3,D4,D6,D7,D8,D9,D10,D11,D12';
+const SUBSET = 'D1,D2,D3,D4,D6,D7,D8,D9,D10,D11,D12,D14';
 
 /**
- * 十三把刀，doctest 的十三个组一组一把（D1–D13）：
+ * 十四把刀，doctest 的十四个组一组一把（D1–D14）：
  *  K1 引擎常量（D1 档位/天花板）   K2 求解器权重（D2 六条规则）    K3 页面 DOM（D8 侧栏读数）
  *  K4 门禁端口（D9）              K5 邻接次序注释（D3 边号契约）  K6 判据数组次序（D4 六个判据）
  *  K7 夹具自测（D5 四套条数）      K8 balance 报表（D6 难度表现值） K9 census 报表（D7 出货上界）
  *  K10 插一行注释（D10 符号锚点）  K11 改 npm script 名（D11 接线） K12 改 UNPINNED needle（D12 墙钟类）
- *  K13 改每组项数钉表（D13 自钉）
+ *  K13 改每组项数钉表（D13 自钉）  K14 改 README 的刀数读数（D14 台账形状）
  * rc 是**实测盖回来的**自钉：0/1 由不得期望，只由不得说谎。
  */
 const KNIVES = [
@@ -185,6 +186,16 @@ const KNIVES = [
     assert: /^\s*FAIL .*D13e 子集内 D3 发.*$/m,
     rc: '1',
   },
+  {
+    id: 'K14',
+    group: 'D14',
+    file: 'README.md',
+    from: '**破坏试验台账**：十四把刀，doctest',
+    to: '**破坏试验台账**：十五把刀，doctest',
+    breaks: '把 README 那句「十四把刀」改成「十五把刀」（台账一字没动、刀还是十四把）——文档写的刀数与现量差一把，D14a 就该当场点名这一处说谎；这一把刀证明"删了刀忘了改文档"不是没人管',
+    assert: /^\s*FAIL .*D14a README 与台账源码里每一处.*$/m,
+    rc: '1',
+  },
 ];
 
 const runDoctest = (env) => {
@@ -289,7 +300,9 @@ for (const r of rows) {
   console.log(`| ${r.id} | ${r.group} | ${r.file} | ${r.red} | 非 0 | ${r.named.replace(/\|/g, '\\|')} | ${r.restored} |`);
 }
 const groups = new Set(KNIVES.map((k) => k.group));
-console.log(`\n十三把刀覆盖的组：${[...groups].sort().join(' / ')}（${groups.size} 组互不相同）· 否决项 ${veto}`);
+// 汇总行的刀数从 KNIVES 现量派生：写死成「十三把刀」的打印会在有人删掉一把刀之后继续说谎。
+const CN_TENS = { 11: '十一', 12: '十二', 13: '十三', 14: '十四', 15: '十五', 16: '十六', 17: '十七', 18: '十八', 19: '十九' };
+console.log(`\n${CN_TENS[KNIVES.length] || KNIVES.length}把刀覆盖的组：${[...groups].sort().join(' / ')}（${groups.size} 组互不相同）· 否决项 ${veto}`);
 console.log('rc 列是台账**实测**盖回自己源码的自钉：把它手改成别的数，下一跑就会因为对不上而重写并说明为什么。');
 if (veto !== 0) {
   console.log('\n=== 台账判红：有刀没把闸带红 / 没点名 / 没还原干净 ===');
