@@ -193,7 +193,7 @@ const KNIVES = [
     from: '**破坏试验台账**：十四把刀，doctest',
     to: '**破坏试验台账**：十五把刀，doctest',
     breaks: '把 README 那句「十四把刀」改成「十五把刀」（台账一字没动、刀还是十四把）——文档写的刀数与现量差一把，D14a 就该当场点名这一处说谎；这一把刀证明"删了刀忘了改文档"不是没人管',
-    assert: /^\s*FAIL .*D14a README 与台账源码里每一处.*$/m,
+    assert: /^\s*FAIL .*D14a README\/ci\.yml\/verify\.sh 里每一处.*$/m,
     rc: '1',
   },
 ];
