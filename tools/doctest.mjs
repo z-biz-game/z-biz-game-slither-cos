@@ -420,8 +420,8 @@ if (inc('D10')) {
     ['js/engine/loop.js', LOOP_SRC, 'regionReport', /export function regionReport/, 96],
     ['js/engine/loop.js', LOOP_SRC, 'growRegion', /function growRegion/, 151],
     ['js/engine/loop.js', LOOP_SRC, 'generateLoop', /export function generateLoop/, 240],
-    ['index.html', HTML, 'canvas#board', /<canvas id="board"/, 57],
-    ['index.html', HTML, '右键那句', /右键：打个叉/, 79],
+    ['index.html', HTML, 'canvas#board', /<canvas id="board"/, 58],
+    ['index.html', HTML, '右键那句', /右键：打个叉/, 80],
   ];
   for (const [file, src, what, re, want] of ANCHORS) {
     const real = lineOf(src, re);

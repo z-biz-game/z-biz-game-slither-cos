@@ -150,7 +150,7 @@ JS 那道管「仿真是不是还在跑」）。
 | `index.html` | 顶栏恢复四颗 HUD 按钮；浮层里那行 `R` 的文案由「重开本局」统一成「重开本题」 |
 | `css/game.css` | 补回并线丢掉的十几个块（顶栏 / HUD / 特效层 / 暂停遮罩 / 玩法浮层 / 键位表 / 点阵底纹）；reduced-motion 段补两支；改掉那段说变量没定义的事实错误注释 |
 | `js/main.js` | 删远端那套 `bindFullscreen` IIFE；删远端那套 `restart()` 与它第二个 `btn-restart` 绑定；本地那套 `restartGame` 改名 `restart`；全屏能力取两边并集（`fullscreenApi` / `markFullscreenUnsupported`）；`onKey` 补两处护栏与 `!busy` 守卫 |
-| `README.md` | 侧栏八个读数、12 颗按钮、键盘通道 9 颗键、行号锚点（`js/main.js:34` / `:71-78` / `:83-93`、`js/store.js:23`、`index.html:57` / `:79` / `:85-87` / `:92-99`）、部署集 34 条引用 / 53 条断言、浏览器门禁 32 条断言、`npm run check` 37/37 文件 |
+| `README.md` | 侧栏八个读数、12 颗按钮、键盘通道 9 颗键、行号锚点（`js/main.js:34` / `:71-78` / `:83-93`、`js/store.js:23`、`index.html:58` / `:79` / `:85-87` / `:92-99`）、部署集 34 条引用 / 53 条断言、浏览器门禁 32 条断言、`npm run check` 37/37 文件 |
 | `DESIGN.md` | `js/store.js:10` → `js/store.js:23` |
 | `tools/doctest.mjs` | D8a/D8b/D8e/D8h/D8j/D8i/D10/D10e/D10e2 的实数与提取口径 |
 | `tools/sabotage.mjs` | K3 那把刀的期望红（「6 个 stat」→「7 个 stat」）、刀口说明文案 |
